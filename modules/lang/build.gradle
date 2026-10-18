@@ -1,0 +1,6 @@
+// lang: 순수 자바 기본 유틸 (문자열/컬렉션/난수 문자열) — 외부 의존성 없음, 모든 모듈의 최하단
+
+dependencies {
+    testImplementation 'org.assertj:assertj-core'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params'
+}

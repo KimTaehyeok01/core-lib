@@ -1,0 +1,16 @@
+server:
+  port: 8108
+
+spring:
+  application:
+    name: example-auth-nice
+
+auth:
+  nice:
+    # NICE 에 서버 출구 IP 를 등록하면 메일로 발급 — 환경변수로만 주입 (비우면 자동설정이 꺼져 [인증하기] 시 설정 오류 안내)
+    client-id: ${NICE_CLIENT_ID:}
+    client-secret: ${NICE_CLIENT_SECRET:}
+    # NICE 에 사전 등록한 도메인이어야 한다
+    return-url: ${NICE_RETURN_URL:http://localhost:8108/nice-auth/return}
+    svc-types: [M]          # M 휴대폰 / F 금융인증서 / I 아이핀 / U 공동인증서 — 계약된 수단만
+    method-type: GET        # 세션 쿠키(SameSite=Lax)가 붙도록 GET 으로 받는다

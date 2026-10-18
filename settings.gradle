@@ -1,0 +1,33 @@
+rootProject.name = 'core-lib'
+
+// 모든 모듈은 modules/ 아래. gradle 경로 = 폴더 경로라서 IntelliJ 에 폴더명 그대로 표시된다
+include 'modules:lang'
+include 'modules:common'
+include 'modules:crypto'
+include 'modules:swagger'
+include 'modules:file'
+include 'modules:mail'
+include 'modules:webclient'
+
+include 'modules:auth:nice'
+include 'modules:auth:kcb'
+
+include 'modules:payment:toss'
+include 'modules:payment:nice'
+include 'modules:payment:kspay'
+
+// 소비팀 참고용 실행 예제 — modules/ 와 같은 모양, 배포하지 않는다
+include 'example:lang'
+include 'example:common'
+include 'example:crypto'
+include 'example:swagger'
+include 'example:file'
+include 'example:mail'
+include 'example:webclient'
+
+include 'example:auth:nice'
+include 'example:auth:kcb'
+
+include 'example:payment:toss'
+include 'example:payment:nice'
+include 'example:payment:kspay'

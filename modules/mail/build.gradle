@@ -1,0 +1,9 @@
+// mail: 메일 발송 공통 기능 제공 (SMTP 는 표준 spring.mail.* 설정, 발송은 MailUtils)
+
+dependencies {
+    api project(':modules:common')
+    api 'org.springframework.boot:spring-boot-starter-mail:3.5.16'
+    api 'org.springframework.boot:spring-boot-starter-validation:3.5.16'    // 요청 DTO 검증(ValidateUtils) 구현체
+
+    testImplementation 'org.assertj:assertj-core'
+}

@@ -1,0 +1,8 @@
+// example-payment-kspay: payment/kspay 모듈(KSPAY 통합모듈 결제창 승인 + webfep 취소) 사용 예제 — http://localhost:8112
+
+dependencies {
+    implementation project(':modules:payment:kspay')
+    implementation project(':modules:common')
+
+    testImplementation testFixtures(project(':modules:webclient'))
+}

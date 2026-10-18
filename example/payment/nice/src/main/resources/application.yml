@@ -1,0 +1,14 @@
+server:
+  port: 8111
+
+spring:
+  application:
+    name: example-payment-nice
+
+# 나이스페이 개발자센터(start.nicepay.co.kr) 가입 → 샌드박스 키를 환경변수로
+# (비우면 자동설정이 꺼져 결제 시 설정 오류를 안내한다)
+payment:
+  nice:
+    client-key: ${NICEPAY_CLIENT_KEY:}          # 결제창 clientId 로도 쓴다 — 브라우저 노출 가능
+    secret-key: ${NICEPAY_SECRET_KEY:}          # 서버 전용, 브라우저 노출 금지
+    base-url: ${NICEPAY_BASE_URL:https://sandbox-api.nicepay.co.kr}   # 운영: https://api.nicepay.co.kr

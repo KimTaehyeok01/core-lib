@@ -1,0 +1,14 @@
+server:
+  port: 8112
+
+spring:
+  application:
+    name: example-payment-kspay
+
+# KSPAY — 상점아이디(mid)가 있으면 자동설정이 켜진다
+payment:
+  kspay:
+    mid: ${KSPAY_MID:2999199999}                    # KSNET 공식 샘플의 테스트 상점아이디
+    api-key: ${KSPAY_API_KEY:}                      # webfep 취소용 pgapi 키 (KSTA > PG상점정보) — 없으면 취소만 안 된다
+    approval-base-url: ${KSPAY_APPROVAL_BASE_URL:https://kspay.ksnet.to}
+    webfep-base-url: ${KSPAY_WEBFEP_BASE_URL:https://paydev.ksnet.co.kr}   # 운영: https://pay.ksnet.co.kr

@@ -1,0 +1,13 @@
+// webclient: 외부 API 호출 공통 (WebFlux WebClient + timeout + 결과확정/불명 분류), testFixtures 로 테스트용 로컬 HTTP 서버 제공
+
+apply plugin: 'java-test-fixtures'
+
+dependencies {
+    api project(':modules:common')
+    api 'org.springframework.boot:spring-boot-starter-webflux:3.5.16'
+    // Boot 3.5.16 기본 netty 4.1.135 는 CVE 10건(CRITICAL 1) — 수정판으로 끌어올린다. 제약은 소비 앱에도 전파된다
+    api platform('io.netty:netty-bom:4.1.139.Final')
+
+    testImplementation 'org.assertj:assertj-core'
+    testRuntimeOnly 'ch.qos.logback:logback-classic'
+}

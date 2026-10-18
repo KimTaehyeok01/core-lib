@@ -1,0 +1,12 @@
+server:
+  port: 8103
+
+spring:
+  application:
+    name: example-crypto
+
+example:
+  crypto:
+    # base64 로 인코딩한 32byte 키 — 환경변수로만 주입한다 (비우면 기동 시 임시 키 생성)
+    aes-key: ${CRYPTO_AES_KEY:}
+    index-key: ${CRYPTO_INDEX_KEY:}       # 이메일 검색 인덱스(HMAC) 키 — 암호화 키와 분리

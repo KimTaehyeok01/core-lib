@@ -1,0 +1,8 @@
+// example-payment-nice: payment/nice 모듈(나이스페이먼츠 결제창 + 서버 승인) 사용 예제 — http://localhost:8111
+
+dependencies {
+    implementation project(':modules:payment:nice')
+    implementation project(':modules:common')
+
+    testImplementation testFixtures(project(':modules:webclient'))
+}

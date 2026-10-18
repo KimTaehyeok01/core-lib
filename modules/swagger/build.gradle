@@ -1,0 +1,12 @@
+// swagger: Swagger/OpenAPI 자동 설정 제공 (의존성만 추가하면 Swagger UI 동작)
+
+dependencies {
+    api project(':modules:common')
+    api 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
+
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+
+    testImplementation 'org.springframework.boot:spring-boot-test'
+    testImplementation 'org.springframework.boot:spring-boot-autoconfigure'
+    testImplementation 'org.assertj:assertj-core'
+}

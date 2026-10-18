@@ -1,0 +1,121 @@
+<!doctype html>
+<!-- KSPAY 결제 예제 화면: 주문 생성 → KSPayWeb form + _pay() 결제창 → /kspay/rcv → goResult() 로 /kspay/result 제출 (KSNET 통합모듈 V1.4 PC 공식 샘플 구조) -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KSPAY 결제 예제</title>
+<script src="https://kspay.ksnet.to/store/KSPayWebV1.4/js/kspay_web_ssl.js"></script>
+<style>
+	body { font-family: sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; }
+	label { display: block; margin-top: 12px; font-weight: bold; }
+	input, select { width: 100%; padding: 8px; box-sizing: border-box; }
+	button { margin-top: 16px; padding: 10px 20px; }
+	.error { color: #c00; }
+</style>
+</head>
+<body>
+<h1>KSPAY 결제 예제</h1>
+
+<!-- 이름(KSPayWeb)·필드명은 통합모듈 규격 그대로 — kspay_web_ssl.js 가 이 form 을 읽는다 -->
+<form name="KSPayWeb" method="post">
+	<label for="sndGoodname">상품명</label>
+	<input id="sndGoodname" name="sndGoodname" required maxlength="50" value="core-lib 에코백">
+	<label for="amountInput">금액</label>
+	<input id="amountInput" type="number" min="100" required value="9000">
+	<label for="sndPaymethod">결제수단</label>
+	<select id="sndPaymethod" name="sndPaymethod">
+		<option value="1000000000">신용카드</option>
+		<option value="0010000000">계좌이체</option>
+		<option value="0100000000">가상계좌</option>
+		<option value="0000010000">휴대폰</option>
+	</select>
+	<!-- 구매자 정보 — 서버에 저장하지 않고 결제창으로만 보낸다 -->
+	<label for="sndOrdername">구매자명</label>
+	<input id="sndOrdername" name="sndOrdername" maxlength="20" value="홍길동">
+	<label for="sndEmail">이메일</label>
+	<input id="sndEmail" name="sndEmail" type="email" maxlength="50">
+	<label for="sndMobile">휴대폰</label>
+	<input id="sndMobile" name="sndMobile" maxlength="12" placeholder="숫자만">
+
+	<!-- 서버 주문 생성 후 채우는 값 -->
+	<input type="hidden" name="sndStoreid">
+	<input type="hidden" name="sndOrdernumber">
+	<input type="hidden" name="sndAmount">
+	<input type="hidden" name="sndReply">
+
+	<!-- 고정 옵션 (공식 샘플 기본값) -->
+	<input type="hidden" name="sndGoodType" value="1">
+	<input type="hidden" name="sndCharSet" value="utf-8">
+	<input type="hidden" name="sndShowcard" value="C">
+	<input type="hidden" name="sndCurrencytype" value="WON">
+	<input type="hidden" name="sndInstallmenttype" value="ALL(0:2:3:4:5:6:7:8:9:10:11:12)">
+	<input type="hidden" name="sndInteresttype" value="NONE">
+	<input type="hidden" name="sndEscrow" value="0">
+	<input type="hidden" name="sndCashReceipt" value="0">
+
+	<!-- 결제창 결과 — /kspay/rcv 가 eparamSet() 으로 채운다 -->
+	<input type="hidden" name="reCommConId">
+	<input type="hidden" name="reCommType">
+	<input type="hidden" name="reHash">
+
+	<button type="submit">결제하기</button>
+</form>
+<p id="message"></p>
+
+<script>
+	const form = document.KSPayWeb;
+	const message = document.getElementById('message');
+
+	function showError(text) {
+		message.className = 'error';
+		message.textContent = text;
+	}
+
+	form.addEventListener('submit', async (event) => {
+		event.preventDefault();
+		// 1. 주문 생성 — 금액은 서버가 저장하고 승인 때 서버 값을 쓴다 (form 의 sndAmount 는 결제창 표시용)
+		const body = await (await fetch('/api/kspay/orders/create', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({goodsName: form.sndGoodname.value, amount: Number(document.getElementById('amountInput').value)})
+		})).json();
+		if (!body.success) {
+			showError('[' + body.code + '] ' + body.message);
+			return;
+		}
+		const order = body.data;
+		form.sndStoreid.value = order.storeId;
+		form.sndOrdernumber.value = order.orderNo;
+		form.sndAmount.value = order.amount;
+		form.sndReply.value = location.origin + '/kspay/rcv';   // 절대 URL 이어야 한다
+
+		// 2. 결제창 호출
+		_pay(form);
+	});
+
+	// === /kspay/rcv 페이지가 opener 로 부르는 함수 (이름 고정) ===
+	function eparamSet(rcid, rctype, rhash) {
+		form.reCommConId.value = rcid;
+		form.reCommType.value = rctype;
+		form.reHash.value = rhash;
+	}
+
+	function goResult() {
+		form.target = '';
+		form.action = '/kspay/result';
+		form.submit();   // submit 이벤트 리스너를 타지 않는다
+	}
+
+	function mcancel() {
+		fetch('/api/kspay/orders/user-cancel', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({orderNo: form.sndOrdernumber.value})
+		});
+		if (typeof closeEvent === 'function') closeEvent();   // kspay_web_ssl.js 의 결제창 닫기
+		showError('결제를 취소했습니다.');
+	}
+</script>
+</body>
+</html>

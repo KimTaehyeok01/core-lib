@@ -1,0 +1,10 @@
+// example-webclient: webclient 모듈(WebClientUtils·실패 분류)로 만든 택배 접수·배송 조회 예제 — http://localhost:8104
+
+dependencies {
+    implementation project(':modules:webclient')
+    implementation project(':modules:common')
+    implementation project(':modules:lang')      // 개인정보 마스킹
+    implementation 'org.springframework.boot:spring-boot-starter-validation'    // ValidateUtils 구현체
+
+    testImplementation testFixtures(project(':modules:webclient'))
+}

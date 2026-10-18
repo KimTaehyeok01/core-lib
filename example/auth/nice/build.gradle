@@ -1,0 +1,10 @@
+// example-auth-nice: auth/nice 모듈(NICE 통합인증) 사용 예제 — http://localhost:8108
+
+dependencies {
+    implementation project(':modules:auth:nice')
+    implementation project(':modules:common')
+    implementation project(':modules:crypto')    // CI 해시
+    implementation project(':modules:lang')      // 개인정보 마스킹
+
+    testImplementation testFixtures(project(':modules:webclient'))
+}

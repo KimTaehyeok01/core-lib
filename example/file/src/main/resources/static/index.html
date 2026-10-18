@@ -1,0 +1,80 @@
+<!doctype html>
+<!-- file 예제 화면: 업로드(multipart) → 목록 → 다운로드 → 삭제 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>첨부파일 예제</title>
+<style>
+	body { font-family: sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+	table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+	th, td { border-bottom: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
+	.error { color: #c00; }
+</style>
+</head>
+<body>
+<h1>첨부파일 예제</h1>
+<p>허용: png, jpg, jpeg, gif, pdf, txt, xlsx, docx (최대 10MB). jsp·php·exe 등 실행 파일은 항상 차단됩니다.</p>
+
+<form id="uploadForm">
+	<input id="file" type="file" required>
+	<button type="submit">업로드</button>
+</form>
+<div id="message"></div>
+
+<table>
+	<thead><tr><th>파일명</th><th>크기</th><th></th></tr></thead>
+	<tbody id="fileList"></tbody>
+</table>
+
+<script>
+	const message = document.getElementById('message');
+
+	function showError(body) {
+		message.className = 'error';
+		message.textContent = '[' + body.code + '] ' + body.message;
+	}
+
+	async function loadList() {
+		const body = await (await fetch('/api/files/list')).json();
+		const tbody = document.getElementById('fileList');
+		tbody.replaceChildren();
+		body.data.forEach(file => {
+			const row = tbody.insertRow();
+			const link = document.createElement('a');
+			link.href = '/api/files/download?key=' + encodeURIComponent(file.key);
+			link.textContent = file.originalName;    // 파일명은 textContent 로 (XSS 방지)
+			row.insertCell().appendChild(link);
+			row.insertCell().textContent = Math.ceil(file.size / 1024) + ' KB';
+			const button = document.createElement('button');
+			button.textContent = '삭제';
+			button.onclick = () => remove(file.key);
+			row.insertCell().appendChild(button);
+		});
+	}
+
+	async function remove(key) {
+		const body = await (await fetch('/api/files/delete', {
+			method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({key})
+		})).json();
+		body.success ? loadList() : showError(body);
+	}
+
+	document.getElementById('uploadForm').addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const form = new FormData();
+		form.append('file', document.getElementById('file').files[0]);
+		const body = await (await fetch('/api/files/upload', {method: 'POST', body: form})).json();
+		if (body.success) {
+			message.className = '';
+			message.textContent = '업로드 완료: ' + body.data.originalName;
+			loadList();
+		} else {
+			showError(body);
+		}
+	});
+
+	loadList();
+</script>
+</body>
+</html>

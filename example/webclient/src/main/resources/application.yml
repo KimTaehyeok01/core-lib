@@ -1,0 +1,14 @@
+server:
+  port: 8104
+
+spring:
+  application:
+    name: example-webclient
+
+example:
+  courier:
+    # 기본은 이 앱 안의 가짜 택배사(/fake-courier). 실제로는 택배사 API 호스트
+    base-url: ${COURIER_BASE_URL:http://localhost:8104/fake-courier}
+    api-key: ${COURIER_API_KEY:}        # 택배사 발급 키 — 환경변수로만. 비우면 인증 헤더를 보내지 않는다
+    connect-timeout: 2s
+    read-timeout: 3s

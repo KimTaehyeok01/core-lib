@@ -1,0 +1,20 @@
+// auth-nice: NICE 통합인증(휴대폰/금융인증서/아이핀/공동인증서 본인확인) 연동 (공식 가이드 auth-guide.niceid.co.kr 기준)
+
+dependencies {
+    api project(':modules:common')
+    api project(':modules:webclient')
+    api project(':modules:crypto')
+    api 'org.springframework.boot:spring-boot-starter-validation:3.5.16'    // 요청 DTO 검증(ValidateUtils) 구현체
+
+    compileOnly 'org.springframework:spring-web'
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind'
+    compileOnly 'org.slf4j:slf4j-api'
+
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind'
+    testImplementation testFixtures(project(':modules:webclient'))
+    testImplementation 'org.assertj:assertj-core'
+    testRuntimeOnly 'ch.qos.logback:logback-classic'
+}

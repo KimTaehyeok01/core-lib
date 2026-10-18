@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- 결제 결과 화면: 주문 상태 조회 + 전액/부분 취소 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>결제 결과</title>
+<style>
+	body { font-family: sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; }
+	dl { display: grid; grid-template-columns: 140px 1fr; gap: 6px; }
+	input { padding: 6px; }
+	button { margin-top: 8px; padding: 8px 16px; }
+	.error { color: #c00; }
+</style>
+</head>
+<body>
+<h1>결제 결과</h1>
+<dl id="detail"></dl>
+
+<h2>취소</h2>
+<input id="cancelAmount" type="number" placeholder="부분취소 금액 (비우면 전액)">
+<button id="cancelButton">취소하기</button>
+<p id="message"></p>
+<p><a href="/">새 주문</a></p>
+
+<script>
+	const orderNo = new URLSearchParams(location.search).get('orderNo');
+	const message = document.getElementById('message');
+
+	function render(order) {
+		const detail = document.getElementById('detail');
+		detail.replaceChildren();
+		const rows = {
+			'주문번호': order.orderNo, '상품명': order.goodsName, '금액': order.amount, '상태': order.status,
+			'결제수단': order.payMethod, '승인번호': order.approvalNo, '거래일시': order.tradedAt, '취소가능 잔액': order.balanceAmount, '사유': order.failMessage
+		};
+		Object.entries(rows).forEach(([label, value]) => {
+			const dt = document.createElement('dt');
+			dt.textContent = label;
+			const dd = document.createElement('dd');
+			dd.textContent = value ?? '-';
+			detail.append(dt, dd);
+		});
+	}
+
+	async function load() {
+		const body = await (await fetch('/api/kspay/orders/detail?orderNo=' + encodeURIComponent(orderNo))).json();
+		body.success ? render(body.data) : (message.textContent = body.message);
+	}
+
+	document.getElementById('cancelButton').addEventListener('click', async () => {
+		const amount = document.getElementById('cancelAmount').value;
+		const body = await (await fetch('/api/kspay/orders/cancel', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({orderNo, cancelAmount: amount ? Number(amount) : null})
+		})).json();
+		if (body.success) {
+			message.className = '';
+			message.textContent = '취소 완료';
+			render(body.data);
+		} else {
+			message.className = 'error';
+			message.textContent = '[' + body.code + '] ' + body.message;
+		}
+	});
+
+	load();
+</script>
+</body>
+</html>

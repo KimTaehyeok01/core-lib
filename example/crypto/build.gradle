@@ -1,0 +1,8 @@
+// example-crypto: crypto 모듈(AES-GCM·HMAC 검색 인덱스·PBKDF2)로 만든 개인정보 암호화 고객 예제 — http://localhost:8103
+
+dependencies {
+    implementation project(':modules:crypto')
+    implementation project(':modules:common')
+    implementation project(':modules:lang')      // 개인정보 마스킹
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+}

@@ -1,0 +1,7 @@
+// example-lang: lang 모듈(StringUtils·CollectionUtils·RandomStringUtils·MaskingUtils)로 만든 비회원 게시판 예제 — http://localhost:8101
+
+dependencies {
+    implementation project(':modules:lang')
+    implementation project(':modules:common')
+    implementation 'org.springframework.boot:spring-boot-starter-validation'    // ValidateUtils 구현체
+}

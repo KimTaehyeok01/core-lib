@@ -1,0 +1,7 @@
+// example-swagger: swagger 모듈(OpenAPI 기본 설정·JWT 보안 스킴) 사용 예제 — http://localhost:8105/swagger-ui.html
+
+dependencies {
+    implementation project(':modules:swagger')
+    implementation project(':modules:common')
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+}

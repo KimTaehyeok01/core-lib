@@ -1,0 +1,7 @@
+// crypto: 암호화 공통 유틸 (AES-GCM/CBC, HMAC, SHA, Base64(url), PBKDF2) — JDK 표준 API 만 사용
+
+dependencies {
+    api project(':modules:common')
+
+    testImplementation 'org.assertj:assertj-core'
+}

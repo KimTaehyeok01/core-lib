@@ -1,0 +1,22 @@
+# checklist
+
+- [x] 멀티모듈 뼈대 + Gradle wrapper + git init
+- [x] modules/ 폴더 구조, gradle 경로 = 폴더 경로
+- [x] lang — StringUtils·CollectionUtils·RandomStringUtils
+- [x] common — 에러코드·예외(addErrorLogData, ErrorCode.of)·ApiResponse·전역 핸들러 자동설정·ValidateUtils
+- [x] crypto — AES(GCM/CBC)·HMAC·SHA·Base64(url)·PBKDF2
+- [x] webclient — WebClientUtils(timeout, 결과확정/불명 분류) + MockHttpServer(testFixtures), netty CVE 상향
+- [x] swagger — OpenAPI 기본 빈 + bearerAuth
+- [x] mail — MailUtils/MailDto/MailInitialize
+- [x] file — Local/S3 저장소, FileUtils, 경로 탈출·위험 확장자 차단
+- [x] payment/toss — 승인/취소/조회, 재조회, 가상계좌, 오류코드 패스스루
+- [x] payment/nice — 인증결과 서명검증, 승인, 자동 망취소, 취소/조회
+- [x] auth/nice — 토큰/표준창/결과, PBKDF2+AES-GCM 복호화, 무결성 검증, txNo 봉인
+- [x] auth/kcb — OkCert3 팝업 시작/결과, 리플렉션 호출
+- [x] payment/kspay — 승인(통합모듈 MS949·재전송)·취소(webfep 카드/계좌/휴대폰/가상계좌)
+- [x] example/ 12개 — Controller/Service/Dto + application.yml + README + 가짜 벤더 서버 전 흐름 테스트
+- [x] 결제·인증·파일·메일 예제 화면(static HTML)
+- [x] 루트 README 예제 섹션, JitPack 좌표 정정, jitpack.yml(JDK 17)
+- [ ] KCB 결과 필드명을 계약 가이드로 확정
+- [ ] 실제 테스트키·계약으로 벤더 런타임 호출 검증
+- [ ] GitHub push + JitPack 릴리스

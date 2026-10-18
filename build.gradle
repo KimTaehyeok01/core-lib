@@ -1,0 +1,95 @@
+// core-lib 멀티모듈 공통 빌드 설정 — modules(배포 라이브러리)와 example(실행 예제)을 나눠 적용
+
+plugins {
+    // 예제 앱 실행(bootRun)·패키징용 — 라이브러리 모듈에는 적용하지 않는다
+    id 'org.springframework.boot' version '3.5.16' apply false
+}
+
+def bootBom = 'org.springframework.boot:spring-boot-dependencies:3.5.16'
+// 묶음 폴더(modules, example, auth, payment)는 빼고 실제 프로젝트에만 적용
+def leafProjects = subprojects.findAll { it.subprojects.isEmpty() }
+
+allprojects {
+    group = 'com.corelib'
+    version = '0.1.0'
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+// === 라이브러리·예제 공통 ===
+configure(leafProjects) {
+    apply plugin: 'java'
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'    // 한글 소스가 OS 기본 인코딩(x-windows-949)으로 깨지는 것 방지
+    }
+
+    tasks.named('test') {
+        useJUnitPlatform()
+    }
+
+    dependencies {
+        // Spring/Jackson 버전을 Spring Boot BOM 으로 정렬 (모듈은 버전 없이 선언)
+        compileOnly platform(bootBom)
+        annotationProcessor platform(bootBom)
+        testAnnotationProcessor platform(bootBom)
+
+        // DTO/설정 클래스의 getter·builder 는 Lombok 으로 (컴파일 시점에만 필요)
+        compileOnly 'org.projectlombok:lombok'
+        annotationProcessor 'org.projectlombok:lombok'
+        testCompileOnly 'org.projectlombok:lombok'
+        testAnnotationProcessor 'org.projectlombok:lombok'
+
+        testImplementation platform(bootBom)
+        testImplementation 'org.junit.jupiter:junit-jupiter'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'    // BOM 과 버전 정렬 (Gradle 번들 launcher 불일치 방지)
+    }
+}
+
+// === 라이브러리 (modules/*) — JitPack·mavenLocal 배포 대상 ===
+configure(leafProjects.findAll { it.path.startsWith(':modules:') }) {
+    apply plugin: 'java-library'
+    apply plugin: 'maven-publish'
+
+    java {
+        withSourcesJar()          // 소비처/JitPack 에서 소스 열람 가능
+    }
+
+    // ./gradlew publishToMavenLocal
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                from components.java
+                // :modules:auth:nice -> auth-nice, :modules:common -> common (중첩 모듈 artifactId 충돌 방지)
+                artifactId = project.path.replaceFirst('^:modules:', '').replace(':', '-')
+            }
+        }
+    }
+}
+
+// === 예제 (example/*) — 소비팀 참고용 실행 앱, 배포하지 않는다 ===
+configure(leafProjects.findAll { it.path.startsWith(':example:') }) {
+    // dependency-management 플러그인은 쓰지 않는다 — webclient 모듈의 netty 보안 상향을 BOM 이 다시 내리지 않게
+    apply plugin: 'org.springframework.boot'
+
+    // modules 와 이름이 같아도(:example:lang ↔ :modules:lang) 좌표가 겹치지 않게 group 을 분리한다
+    group = 'com.corelib.example'
+
+    dependencies {
+        implementation platform(bootBom)
+        implementation 'org.springframework.boot:spring-boot-starter-web'
+
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    }
+
+    tasks.named('jar') {
+        enabled = false    // 실행용 bootJar 만 만든다
+    }
+}

@@ -1,0 +1,8 @@
+// example-mail: mail 모듈(MailUtils)로 만든 이메일 인증코드 발송·확인 예제 — http://localhost:8106
+
+dependencies {
+    implementation project(':modules:mail')
+    implementation project(':modules:common')
+    implementation project(':modules:crypto')    // 코드 해시·상수 시간 비교
+    implementation project(':modules:lang')      // 코드 생성·이메일 마스킹
+}

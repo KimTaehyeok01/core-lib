@@ -1,0 +1,23 @@
+<!doctype html>
+<!-- return_url 처리 후 팝업이 도착하는 페이지: 부모 창에 결과를 알리고 닫힌다 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>본인인증 완료</title>
+</head>
+<body>
+<p id="text">처리 중...</p>
+<script>
+	const params = new URLSearchParams(location.search);
+	const isSuccess = params.get('result') === 'success';
+	const message = params.get('message') || '';
+	if (window.opener) {
+		window.opener.postMessage({type: 'nice-auth-done', isSuccess, message}, location.origin);
+		window.close();
+	} else {
+		// 팝업이 아니라 같은 창에서 열린 경우(모바일 등)
+		document.getElementById('text').textContent = isSuccess ? '인증 완료 — 이전 화면으로 돌아가세요.' : '인증 실패: ' + message;
+	}
+</script>
+</body>
+</html>

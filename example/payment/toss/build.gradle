@@ -1,0 +1,8 @@
+// example-payment-toss: payment/toss 모듈(토스페이먼츠 결제창 SDK v2 + 서버 승인) 사용 예제 — http://localhost:8110
+
+dependencies {
+    implementation project(':modules:payment:toss')
+    implementation project(':modules:common')
+
+    testImplementation testFixtures(project(':modules:webclient'))
+}

@@ -1,0 +1,17 @@
+server:
+  port: 8109
+
+spring:
+  application:
+    name: example-auth-kcb
+
+auth:
+  kcb:
+    # KCB 계약 후 받는 회원사코드(12자리)와 라이선스 파일 — 환경변수로만 (비우면 자동설정이 꺼져 [인증하기] 시 설정 오류 안내)
+    cp-cd: ${KCB_CP_CD:}
+    license-path: ${KCB_LICENSE_PATH:}
+    target: ${KCB_TARGET:TEST}       # TEST / PROD
+    return-url: ${KCB_RETURN_URL:http://localhost:8109/kcb/return}
+    site-name: ${KCB_SITE_NAME:core-lib 예제}
+    site-url: ${KCB_SITE_URL:localhost:8109}
+    request-cause: SIGN_UP

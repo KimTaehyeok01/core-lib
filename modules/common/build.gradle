@@ -1,0 +1,22 @@
+// common: 모든 모듈의 토대 — 공통 예외/에러코드/응답 포맷/유틸
+// 원칙: 외부 의존성 최소화. Spring 등을 넣으면 소비처가 전부 끌려온다.
+
+dependencies {
+    api project(':modules:lang')    // StringUtils 등 기본 유틸
+
+    // 전역 예외 핸들러 + 자동설정용 — compileOnly 라 소비처로 전파되지 않음 (웹 앱이 런타임에 이미 보유)
+    compileOnly 'org.springframework:spring-web'
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    compileOnly 'org.slf4j:slf4j-api'
+    compileOnly 'jakarta.validation:jakarta.validation-api'    // ValidateUtils - 구현체는 소비 앱 starter-validation
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation'
+    testImplementation 'org.springframework.boot:spring-boot-test'
+    testImplementation 'org.springframework.boot:spring-boot-autoconfigure'
+    testImplementation 'org.springframework:spring-test'
+    testImplementation 'org.springframework:spring-web'
+    testImplementation 'org.springframework:spring-webmvc'    // 핸들러 테스트의 NoResourceFoundException
+    testImplementation 'jakarta.servlet:jakarta.servlet-api'
+    testImplementation 'org.assertj:assertj-core'
+    testRuntimeOnly 'ch.qos.logback:logback-classic'
+}

@@ -1,0 +1,15 @@
+server:
+  port: 8105
+
+spring:
+  application:
+    name: example-swagger
+
+core:
+  swagger:
+    title: core-lib 예제 API
+    description: swagger 모듈 사용 예제 — 우측 상단 Authorize 에 JWT 를 넣으면 자물쇠 API 에 Bearer 헤더가 붙는다
+    version: v1
+
+# springdoc 기본값 그대로: UI /swagger-ui.html, 문서 JSON /v3/api-docs
+# 운영에서 문서를 숨기려면 springdoc.api-docs.enabled=false, springdoc.swagger-ui.enabled=false

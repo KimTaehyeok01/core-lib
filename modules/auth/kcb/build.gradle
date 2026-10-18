@@ -1,0 +1,16 @@
+// auth-kcb: KCB 휴대폰 본인확인(OkCert3 팝업) 연동 — KCB 전용 jar 는 계약 후 소비 앱이 classpath 에 추가, 코어는 리플렉션으로 호출
+
+dependencies {
+    api project(':modules:common')
+    api 'org.springframework.boot:spring-boot-starter-validation:3.5.16'    // 요청 DTO 검증(ValidateUtils) 구현체
+
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind'
+    compileOnly 'org.slf4j:slf4j-api'
+
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind'
+    testImplementation 'org.assertj:assertj-core'
+    testRuntimeOnly 'ch.qos.logback:logback-classic'
+}

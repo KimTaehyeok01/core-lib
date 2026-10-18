@@ -1,0 +1,6 @@
+// example-common: common 모듈(ApiResponse·CoreException·전역 예외 핸들러·ValidateUtils) 사용 예제 — http://localhost:8102
+
+dependencies {
+    implementation project(':modules:common')
+    implementation 'org.springframework.boot:spring-boot-starter-validation'    // ValidateUtils 구현체
+}

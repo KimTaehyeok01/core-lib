@@ -1,0 +1,11 @@
+// example-auth-kcb: auth/kcb 모듈(KCB 휴대폰 본인확인 OkCert3 팝업) 사용 예제 — http://localhost:8109
+
+dependencies {
+    implementation project(':modules:auth:kcb')
+    implementation project(':modules:common')
+    implementation project(':modules:crypto')    // CI 해시
+    implementation project(':modules:lang')      // 개인정보 마스킹
+
+    // KCB 계약 후 받은 OkCert3 jar 를 example/auth/kcb/libs/ 에 두면 실제 연동된다 (저장소에는 올리지 않는다)
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+}

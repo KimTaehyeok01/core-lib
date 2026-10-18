@@ -1,0 +1,32 @@
+# Gradle
+.gradle/
+build/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse / VS Code
+.classpath
+.project
+.settings/
+bin/
+.vscode/
+
+# Java
+*.class
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 주의: gradle/wrapper/gradle-wrapper.jar 는 커밋해야 함 (ignore 금지)
+
+# 예제 앱이 로컬에 저장한 업로드 파일
+example/**/uploads/
+# KCB 계약 jar (배포 금지)
+example/auth/kcb/libs/

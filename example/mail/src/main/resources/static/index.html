@@ -1,0 +1,67 @@
+<!doctype html>
+<!-- 이메일 인증 예제 화면: 이메일 입력 → 인증코드 발송 → 코드 입력 → 인증 완료 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>이메일 인증 예제</title>
+<style>
+	body { font-family: sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; }
+	label { display: block; margin-top: 12px; font-weight: bold; }
+	input { width: 100%; padding: 8px; box-sizing: border-box; }
+	button { margin-top: 12px; padding: 10px 20px; }
+	.error { color: #c00; }
+	.ok { color: #070; }
+</style>
+</head>
+<body>
+<h1>이메일 인증 예제</h1>
+<p>기본 SMTP 는 로컬 Mailpit(localhost:1025)입니다. 받은 메일은 http://localhost:8025 에서 확인하세요.</p>
+
+<form id="sendForm">
+	<label for="email">이메일</label>
+	<input id="email" type="email" required value="user@example.com">
+	<button type="submit">인증코드 받기</button>
+</form>
+
+<form id="confirmForm" hidden>
+	<label for="code">인증코드 (6자리)</label>
+	<input id="code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required>
+	<button type="submit">인증하기</button>
+</form>
+<p id="message"></p>
+
+<script>
+	const message = document.getElementById('message');
+
+	function show(text, isError) {
+		message.className = isError ? 'error' : 'ok';
+		message.textContent = text;
+	}
+
+	async function postJson(url, data) {
+		return (await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)})).json();
+	}
+
+	document.getElementById('sendForm').addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const body = await postJson('/api/email-verifications/send', {email: document.getElementById('email').value});
+		if (!body.success) {
+			show('[' + body.code + '] ' + body.message, true);
+			return;
+		}
+		document.getElementById('confirmForm').hidden = false;
+		show(body.data.maskedEmail + ' 로 보냈습니다. 만료 ' + body.data.expiresAt, false);
+	});
+
+	document.getElementById('confirmForm').addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const body = await postJson('/api/email-verifications/confirm', {
+			email: document.getElementById('email').value,
+			code: document.getElementById('code').value
+		});
+		body.success ? show('인증 완료 (' + body.data.verifiedAt + ')', false) : show('[' + body.code + '] ' + body.message, true);
+	});
+</script>
+</body>
+</html>
