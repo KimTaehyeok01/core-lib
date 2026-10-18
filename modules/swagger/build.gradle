@@ -9,4 +9,5 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-test'
     testImplementation 'org.springframework.boot:spring-boot-autoconfigure'
     testImplementation 'org.assertj:assertj-core'
+    testImplementation 'org.springframework:spring-web'    // HandlerMethod
 }

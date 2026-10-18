@@ -11,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
+import com.corelib.common.startup.StartupReport;
+import com.corelib.common.startup.StartupReporter;
+import java.util.List;
 import com.corelib.webclient.fixture.MockHttpServer;
 import com.corelib.webclient.fixture.MockHttpServer.MockResponse;
 import com.jayway.jsonpath.JsonPath;
@@ -39,6 +42,7 @@ class KsPayExampleTest {
 	private static final String CANCEL_OK = "{\"code\":\"A0200\",\"data\":{\"respCode\":\"0000\",\"respMessage\":\"승인취소완료\"}}";
 
 	private final MockMvc mockMvc;
+	private final List<StartupReporter> startupReporters;
 
 	@DynamicPropertySource
 	static void properties(DynamicPropertyRegistry registry) {
@@ -146,5 +150,14 @@ class KsPayExampleTest {
 
 		mockMvc.perform(post("/kspay/rcv").contentType(MediaType.APPLICATION_FORM_URLENCODED).param("reCnclType", "1"))
 			   .andExpect(content().string(containsString("data-canceled=\"true\"")));
+	}
+
+	@Test
+	@DisplayName("기동 안내 - KsPayUtils 보고")
+	void startupReport() {
+		StartupReport report = startupReporters.stream().map(StartupReporter::report)
+											   .filter(item -> item.getName().equals("KsPayUtils")).findFirst().orElseThrow();
+		assertThat(report.isReady()).isEqualTo(true);
+		assertThat(report.getDetail()).contains("mid=2999199999", "취소 가능");
 	}
 }

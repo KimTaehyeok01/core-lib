@@ -9,6 +9,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.corelib.common.startup.StartupReport;
+import com.corelib.common.startup.StartupReporter;
+import java.util.List;
 import com.corelib.webclient.fixture.MockHttpServer;
 import com.corelib.webclient.fixture.MockHttpServer.MockResponse;
 import com.jayway.jsonpath.JsonPath;
@@ -48,6 +51,7 @@ class NiceAuthExampleTest {
 	private static final int ITERATORS = 66;
 
 	private final MockMvc mockMvc;
+	private final List<StartupReporter> startupReporters;
 
 	@DynamicPropertySource
 	static void properties(DynamicPropertyRegistry registry) {
@@ -153,5 +157,14 @@ class NiceAuthExampleTest {
 	void resultWithoutAuth() throws Exception {
 		mockMvc.perform(get("/api/nice-auth/result").session(new MockHttpSession()))
 			   .andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("기동 안내 - NiceAuthUtils 보고")
+	void startupReport() {
+		StartupReport report = startupReporters.stream().map(StartupReporter::report)
+											   .filter(item -> item.getName().equals("NiceAuthUtils")).findFirst().orElseThrow();
+		assertThat(report.isReady()).isEqualTo(true);
+		assertThat(report.getDetail()).contains("인증수단=[M]");
 	}
 }

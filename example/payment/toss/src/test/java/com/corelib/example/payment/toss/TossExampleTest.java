@@ -8,6 +8,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
+import com.corelib.common.startup.StartupReport;
+import com.corelib.common.startup.StartupReporter;
+import java.util.List;
 import com.corelib.webclient.fixture.MockHttpServer;
 import com.corelib.webclient.fixture.MockHttpServer.MockResponse;
 import com.jayway.jsonpath.JsonPath;
@@ -32,6 +35,7 @@ class TossExampleTest {
 	static final MockHttpServer TOSS = MockHttpServer.start();
 
 	private final MockMvc mockMvc;
+	private final List<StartupReporter> startupReporters;
 
 	@DynamicPropertySource
 	static void properties(DynamicPropertyRegistry registry) {
@@ -116,5 +120,14 @@ class TossExampleTest {
 	void userCanceled() throws Exception {
 		mockMvc.perform(get("/toss/fail").param("code", "PAY_PROCESS_CANCELED").param("message", "사용자가 결제를 취소하였습니다"))
 			   .andExpect(header().string("Location", startsWith("/fail.html?code=PAY_PROCESS_CANCELED")));
+	}
+
+	@Test
+	@DisplayName("기동 안내 - TossPayUtils 보고")
+	void startupReport() {
+		StartupReport report = startupReporters.stream().map(StartupReporter::report)
+											   .filter(item -> item.getName().equals("TossPayUtils")).findFirst().orElseThrow();
+		assertThat(report.isReady()).isEqualTo(true);
+		assertThat(report.getDetail()).contains("테스트 키");
 	}
 }

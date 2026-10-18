@@ -17,6 +17,10 @@
 - [x] example/ 12개 — Controller/Service/Dto + application.yml + README + 가짜 벤더 서버 전 흐름 테스트
 - [x] 결제·인증·파일·메일 예제 화면(static HTML)
 - [x] 루트 README 예제 섹션, JitPack 좌표 정정, jitpack.yml(JDK 17)
+- [x] lang MaskingUtils, 예제를 실제 업무 흐름으로 재작성(회원가입·게시판·암호화 고객·택배·이메일 인증)
+- [x] 전역 핸들러 — Spring MVC 요청 오류 4xx 매핑
+- [x] 기동 안내(CORE 로고·주소·모듈 초기화 결과), Swagger 공통 에러 응답 yml 설정
+- [x] GitHub push (first commit)
 - [ ] KCB 결과 필드명을 계약 가이드로 확정
 - [ ] 실제 테스트키·계약으로 벤더 런타임 호출 검증
-- [ ] GitHub push + JitPack 릴리스
+- [ ] JitPack 릴리스(v0.1.0) 빌드 확인

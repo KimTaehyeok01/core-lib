@@ -1,9 +1,26 @@
 # core-lib
 
-개인 프로젝트에서 재사용할 공통 모듈 라이브러리. 필요한 모듈만 골라 의존성으로 붙이면 자동설정으로 바로 동작한다.
+개인 프로젝트에서 재사용할 공통 모듈 라이브러리. 결제·본인인증·파일·메일 같은 기능을 프로젝트마다 다시 만들지 않도록,
+필요한 모듈만 골라 의존성으로 붙이면 자동설정으로 바로 동작한다.
 
-- JDK 17 / Spring Boot 3.5.x (Servlet·MVC) / Gradle 8.14.3 (wrapper 포함)
-- 패키지 `com.corelib.*`, 그룹 `com.corelib`
+- `modules/` — 라이브러리 본체 (배포 대상)
+- `example/` — 모듈 사용법 가이드. 각 모듈을 서비스 코드에서 어떻게 부르는지 보여주는 실행 가능한 예제 (배포 제외)
+- JDK 17 / Spring Boot 3.5.x (Servlet·MVC) / Gradle 8.14.3 (wrapper 포함), 패키지 `com.corelib.*`
+
+## 시작하기 — 새 프로젝트에 붙이는 3단계
+
+1. **의존성** — 필요한 모듈만 (좌표는 아래 [모듈 좌표](#모듈-좌표-artifactid))
+   ```groovy
+   repositories { maven { url 'https://jitpack.io' } }
+   dependencies {
+       implementation 'com.github.KimTaehyeok01.core-lib:common:v0.1.0'
+       implementation 'com.github.KimTaehyeok01.core-lib:payment-toss:v0.1.0'
+   }
+   ```
+2. **yml** — 모듈별 설정(키는 `${환경변수}` 로만). 아래 [모듈별 사용법](#모듈별-사용법) 또는 `example/{모듈}/src/main/resources/application.yml`
+3. **서비스에서 호출** — `TossPayUtils.confirm(...)` 처럼 static 유틸을 부른다. 흐름은 `example/{모듈}/.../service/` 를 그대로 따라 한다
+
+앱을 실행하면 콘솔의 **기동 안내**에 붙인 모듈의 초기화 결과가 나온다 — `미초기화` 가 보이면 적힌 설정을 넣으면 된다.
 
 ## 구조
 
@@ -46,7 +63,7 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 | `example/common` | 8102 | ApiResponse·CoreException·검증 400 | - |
 | `example/crypto` | 8103 | 개인정보 암호화 고객 (가입·로그인) | `CRYPTO_AES_KEY`, `CRYPTO_INDEX_KEY` (없으면 임시키) |
 | `example/webclient` | 8104 | 택배 접수·배송 조회 (내장 가짜 택배사) | - |
-| `example/swagger` | 8105 | `/swagger-ui.html` | - |
+| `example/swagger` | 8105 | `/swagger-ui.html` — 공통 에러 응답 켜고 끄기 | - |
 | `example/mail` | 8106 | 이메일 인증코드 발송·확인 (`index.html`) | 기본 Mailpit `localhost:1025` |
 | `example/file` | 8107 | 업로드·다운로드·삭제 (`index.html`) | - (로컬 저장) |
 | `example/auth/nice` | 8108 | 본인인증 → CI 로 가입/로그인 (14세 미만 차단) | `NICE_CLIENT_ID`, `NICE_CLIENT_SECRET` |
@@ -60,8 +77,10 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 ## 설계 원칙
 
 - core 는 **기능**만 제공하고 **비즈니스 판단**은 하지 않는다 — 도메인(주문/회원)을 모른 채 "요청을 처리하고 결과를 검증해 돌려주는" 지점까지만 책임진다.
-- 벤더 모듈은 `{벤더}Property`(설정·`validate()`) / `{벤더}Utils`(static 진입점) / `{벤더}Dto`(요청·응답) / `{벤더}Initialize`(자동설정) 로 나눈다.
-- 자동설정은 각 모듈의 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 에 등록한다 — 소비 앱 패키지가 달라도 의존성만 붙이면 동작한다.
+- core 는 **상태·업무 데이터를 저장하지 않는다** — 어디에 쓰일지 모르기 때문. 주문·회원·결제 결과·인증 결과·벤더 토큰은 보관하지 않고 호출측에 돌려준다. Utils 가 들고 있는 것은 기동 시 한 번 넣는 설정·도구(WebClient, Property)뿐이다. (예외: file 모듈은 파일 저장이 역할이며 위치는 소비 앱이 정한다)
+- 벤더 모듈은 `{벤더}Property`(설정·`validate()`) / `{벤더}Utils`(static 진입점) / `{벤더}Dto`(요청·응답) / `{벤더}Initialize`(자동설정) / `{벤더}StartupReport`(기동 안내 보고) 로 나눈다.
+  - Initialize 는 키가 없으면 꺼진다(앱은 뜨고 호출 시 "미초기화"). StartupReport 는 조건 없이 등록돼 꺼진 경우에도 무엇이 빠졌는지 알린다.
+- 자동설정은 각 모듈의 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports` 에 등록한다 — 소비 앱 패키지가 달라도 의존성만 붙이면 동작한다. (IntelliJ 에서 이 파일이 Spring 아이콘으로 보이는 건 유료 Spring 플러그인 표시일 뿐, 동작과 무관)
 - 결제는 무상태 — 기대 주문번호·금액은 호출측이 보관하고 응답과 대조한다. 실패는 **결과확정**(거절·미전송)과 **결과불명**(timeout·5xx)으로 나눠 처리한다.
 - 에러는 `CoreException` 하나로 던지고, 전역 핸들러가 `ApiResponse` 로 바꾼다. 벤더 오류코드는 `TOSS_{code}` / `NICEPAY_{code}` / `KSPAY_{code}` / `NICE_{code}` / `KCB_{code}` 로 그대로 넘긴다.
 - 개인정보(이름·CI·DI·휴대폰·카드번호·이메일)는 로그·예외 메시지에 남기지 않는다.
@@ -78,7 +97,19 @@ throw new CoreException(CommonErrorCode.NOT_FOUND).addErrorLogData("orderId", or
 return ApiResponse.success(data);
 ValidateUtils.validate(request);                                                          // jakarta 어노테이션 검증
 ```
-웹 앱이면 전역 예외 핸들러(`CoreExceptionHandler`)가 자동 등록된다.
+웹 앱이면 전역 예외 핸들러(`CoreExceptionHandler`)가 자동 등록된다 — `CoreException` 은 담긴 코드·상태로, Spring MVC 요청 오류(깨진 JSON·파라미터 누락·405·없는 경로)는 C400/C404/C405 로, 그 외는 내부 메시지를 숨기고 C500 으로.
+
+**기동 안내** — 앱이 뜨면 콘솔에 노란 CORE 로고, 실행 주소(Local·Network·Swagger), 붙인 모듈의 초기화 결과가 한 번 찍힌다.
+키가 없어 꺼진 모듈은 `미초기화 — payment.toss.secret-key 미설정` 처럼 무엇을 넣으면 되는지 알려준다(키·비밀번호는 찍지 않는다).
+```yaml
+core:
+  startup-log:
+    enabled: true          # false 면 출력 안 함
+spring:
+  output:
+    ansi:
+      enabled: always      # IntelliJ 일반 실행에서도 색 표시
+```
 
 ### crypto
 
@@ -223,6 +254,8 @@ core:
 ```
 ```java
 MailUtils.sendText("user@example.com", "가입 안내", "환영합니다");
+MailUtils.sendHtml("user@example.com", "인증코드", "<b>123456</b>");
+MailUtils.send(MailDto.SendRequest...);   // 참조·숨은참조·첨부
 ```
 
 ### swagger
@@ -235,6 +268,18 @@ core:
 ```
 JWT 보안 스킴 `bearerAuth` 가 등록된다 — 컨트롤러에 `@SecurityRequirement(name = SwaggerAutoConfiguration.BEARER_SCHEME)`.
 
+공통 에러 응답을 yml 로 켜고 끈다 — 예시 본문은 전역 핸들러와 같은 `ApiResponse`(C400·C404…).
+```yaml
+core:
+  swagger:
+    error-responses:
+      enabled: true              # 한 줄로 켜고 끄기
+      codes: [400, 404, 500]     # 모든 API
+      secured-codes: [401, 403]  # @SecurityRequirement API 에만
+```
+- 컨트롤러에 직접 적은 `@ApiResponse` 코드는 덮어쓰지 않는다
+- UI 기본값으로 API 목록 접힘(`doc-expansion: none`), Schemas 숨김(`default-models-expand-depth: -1`) — yml 에 같은 키를 적으면 그 값이 우선
+
 ## 주의
 
 | 항목 | 내용 |
@@ -242,7 +287,10 @@ JWT 보안 스킴 `bearerAuth` 가 등록된다 — 컨트롤러에 `@SecurityRe
 | KCB 결과 필드명 | 호출 규격(서비스명·form 필드)은 공개 샘플로 확인했지만 결과 필드명(RSLT_NAME 등)은 공개 자료로 확정하지 못했다. 계약 가이드와 다르면 `ConfirmResponse.getRaw()` 로 꺼내 쓰고 매핑을 고친다 |
 | netty 버전 | webclient 모듈이 netty 를 4.1.139.Final 로 올린다(Boot 3.5.16 기본 4.1.135 는 CVE 10건). 소비 앱이 Spring dependency-management 플러그인을 쓰면 BOM 이 다시 내릴 수 있으니 `ext['netty.version'] = '4.1.139.Final'` 를 지정한다 |
 | Spring 6.2 CVE | spring-webmvc CVE-2026-47890·47884, spring-webflux CVE-2026-47892 는 7.0.9 에서만 수정됐다. 각각 SSE fragment·XsltView·WebFlux **서버** 함수형 라우팅 문제라 이 라이브러리 사용 범위와 무관. Boot 4 전환 시 해소 |
-| 런타임 검증 | 모든 벤더 연동은 공식 스펙 + 단위테스트(로컬 HTTP 서버·가짜 모듈)로 검증했다. 실제 키·계약으로 호출해 보는 검증은 별도로 필요 |
+| 런타임 검증 | 모든 벤더 연동은 공식 스펙 + 단위테스트(로컬 HTTP 서버·가짜 모듈)로 검증했다. 실제 키·계약으로 호출해 보는 검증은 별도로 필요 (KSPAY 는 실제 승인 서버 응답 해석까지 확인) |
+| KSPAY 승인 불일치 | 승인 응답의 상점아이디·주문번호·금액이 다르면 예외에 TID 가 없어 자동취소할 수 없다 — 예제는 결과불명(관리자 확인)으로 둔다 |
+| static 설정 | Utils 는 설정·도구를 static 으로 든다 — 한 JVM 에 Spring 앱을 둘 이상 띄우면 나중에 뜬 쪽 설정이 이긴다(일반 서비스는 무관) |
+| JitPack | `jitpack.yml` 은 있으나 release 태그로 실제 빌드해 본 적은 아직 없다 |
 
 ## 모듈 좌표 (artifactId)
 
@@ -273,10 +321,11 @@ dependencies { implementation 'com.corelib:payment-toss:0.1.0' }
 
 ### 공개 배포 (JitPack)
 
-GitHub 에 push 하고 release 태그를 찍으면 JitPack 이 빌드/배포한다(`jitpack.yml` 로 JDK 17 지정).
+GitHub 레포(https://github.com/KimTaehyeok01/core-lib)에서 **Releases → Create a new release** 로 태그(예: `v0.1.0`)를 만들면
+JitPack 이 그 시점 코드를 빌드해 배포한다(`jitpack.yml` 로 JDK 17 지정). 첫 빌드는 jitpack.io 에서 저장소를 조회하면 시작된다.
 멀티 모듈이라 좌표는 `com.github.{GitHub 계정}.{저장소}:{artifactId}:{태그}` 이다.
 
 ```groovy
 repositories { maven { url 'https://jitpack.io' } }
-dependencies { implementation 'com.github.KimTaehyeok01.core-lib:payment-toss:1.0.0' }
+dependencies { implementation 'com.github.KimTaehyeok01.core-lib:payment-toss:v0.1.0' }
 ```

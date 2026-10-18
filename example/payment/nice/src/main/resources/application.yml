@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: example-payment-nice
+  output:
+    ansi:
+      enabled: always       # IntelliJ 콘솔에서도 색 표시 (CORE 로고 노란색)
 
 # 나이스페이 개발자센터(start.nicepay.co.kr) 가입 → 샌드박스 키를 환경변수로
 # (비우면 자동설정이 꺼져 결제 시 설정 오류를 안내한다)

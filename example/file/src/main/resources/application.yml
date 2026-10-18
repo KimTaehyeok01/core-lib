@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: example-file
+  output:
+    ansi:
+      enabled: always       # IntelliJ 콘솔에서도 색 표시 (CORE 로고 노란색)
   servlet:
     multipart:
       # core.file.max-size 와 맞춘다 (요청 전체는 조금 더 크게)

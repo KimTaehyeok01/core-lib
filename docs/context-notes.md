@@ -71,3 +71,11 @@
   - mail: 이메일 인증코드 — 해시 보관·상수 시간 비교·재발송 대기·5회 오입력 폐기
 - 예제마다 손으로 짠 마스킹 함수가 있었다 → lang 에 `MaskingUtils`(name·mobile·email) 추가하고 예제는 그것만 쓴다. 휴대폰 마스킹 형식은 010-****-5678 로 통일.
 - common·swagger·file·payment 예제는 이미 실제 흐름(재고 차감·상품·첨부·주문 결제)이라 유지.
+
+## 6차 — 기동 안내·Swagger 공통 에러 (2026-10-18)
+- 기동 안내(common): ApplicationReadyEvent 에 노란 CORE 로고 + Local/Network/Swagger 주소 + 모듈 초기화 결과를 로그 한 번(여러 줄)으로. `core.startup-log.enabled` 로 끈다.
+- 모듈 보고는 `StartupReporter` 빈 — 벤더 Initialize 는 키가 없으면 꺼지므로 보고 클래스(`XxxStartupReport`)는 조건 없는 별도 자동설정으로 두고, Initialize 빈 유무로 초기화/미초기화를 판단한다. 키·비밀번호·회원사코드·라이선스 경로는 찍지 않고, 이메일은 마스킹. KSPAY mid 는 결제창 form 으로 나가는 공개값이라 그대로.
+- 색은 Spring AnsiOutput 을 따른다 — 무료 IntelliJ 일반 실행은 감지가 꺼져 색이 빠지므로 예제 yml 에 `spring.output.ansi.enabled: always`.
+- Swagger 공통 에러: OperationCustomizer 로 codes(기본 400·404·500)는 전부, secured-codes(기본 401·403)는 @SecurityRequirement API 에만. 직접 적은 응답 코드는 유지. 본문 스키마 CoreErrorResponse 는 OpenApiCustomizer 로 넣어 소비 앱이 OpenAPI 빈을 직접 만들어도 붙는다.
+- Swagger UI 기본값(doc-expansion none, models depth -1)은 EnvironmentPostProcessor 로 맨 뒤 우선순위에 넣어 소비 앱 yml 이 이긴다.
+- IntelliJ 에서 .imports 파일이 초록 아이콘이 아닌 건 유료 Spring 플러그인 표시 차이 — 동작과 무관.

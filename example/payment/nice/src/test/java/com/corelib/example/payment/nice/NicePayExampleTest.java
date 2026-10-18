@@ -9,6 +9,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
+import com.corelib.common.startup.StartupReport;
+import com.corelib.common.startup.StartupReporter;
+import java.util.List;
 import com.corelib.webclient.fixture.MockHttpServer;
 import com.corelib.webclient.fixture.MockHttpServer.MockResponse;
 import com.jayway.jsonpath.JsonPath;
@@ -41,6 +44,7 @@ class NicePayExampleTest {
 	private static final String EDI_DATE = "2026-10-18T10:00:00.000+0900";
 
 	private final MockMvc mockMvc;
+	private final List<StartupReporter> startupReporters;
 
 	@DynamicPropertySource
 	static void properties(DynamicPropertyRegistry registry) {
@@ -167,5 +171,14 @@ class NicePayExampleTest {
 											   .param("authResultCode", "9999").param("authResultMsg", "사용자 취소")
 											   .param("orderId", orderId).param("clientId", CLIENT_KEY))
 			   .andExpect(header().string("Location", startsWith("/fail.html?code=NICEPAY_9999")));
+	}
+
+	@Test
+	@DisplayName("기동 안내 - NicePayUtils 보고")
+	void startupReport() {
+		StartupReport report = startupReporters.stream().map(StartupReporter::report)
+											   .filter(item -> item.getName().equals("NicePayUtils")).findFirst().orElseThrow();
+		assertThat(report.isReady()).isEqualTo(true);
+		assertThat(report.getDetail()).contains("base-url=http://127.0.0.1");
 	}
 }

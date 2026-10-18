@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.corelib.common.startup.StartupReport;
+import com.corelib.common.startup.StartupReporter;
 import jakarta.mail.Message;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
@@ -64,6 +66,7 @@ class EmailVerificationExampleTest {
 	}
 
 	private final MockMvc mockMvc;
+	private final List<StartupReporter> startupReporters;
 	private final JavaMailSender javaMailSender;
 
 	private CapturingMailSender sender() {
@@ -140,5 +143,14 @@ class EmailVerificationExampleTest {
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("C400"));
 		assertThat(sender().sent).isEmpty();
+	}
+
+	@Test
+	@DisplayName("기동 안내 - MailUtils 보고")
+	void startupReport() {
+		StartupReport report = startupReporters.stream().map(StartupReporter::report)
+											   .filter(item -> item.getName().equals("MailUtils")).findFirst().orElseThrow();
+		assertThat(report.isReady()).isEqualTo(true);
+		assertThat(report.getDetail()).contains("smtp=localhost:1025", "from=no*****@example.com");
 	}
 }

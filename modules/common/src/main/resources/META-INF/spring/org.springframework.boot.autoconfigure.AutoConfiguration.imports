@@ -1,1 +1,2 @@
 com.corelib.common.CommonAutoConfiguration
+com.corelib.common.startup.StartupLogAutoConfiguration

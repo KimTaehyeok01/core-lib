@@ -10,6 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.corelib.common.startup.StartupReport;
+import com.corelib.common.startup.StartupReporter;
+import java.util.List;
 import com.jayway.jsonpath.JsonPath;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -37,6 +40,7 @@ class KcbAuthExampleTest {
 	static Path licenseDir;
 
 	private final MockMvc mockMvc;
+	private final List<StartupReporter> startupReporters;
 
 	@DynamicPropertySource
 	static void properties(DynamicPropertyRegistry registry) {
@@ -96,5 +100,14 @@ class KcbAuthExampleTest {
 		mockMvc.perform(get("/kcb/return").param("mdl_tkn", "bad").session(new MockHttpSession()))
 			   .andExpect(status().isFound())
 			   .andExpect(header().string("Location", startsWith("/done.html?result=fail")));
+	}
+
+	@Test
+	@DisplayName("기동 안내 - KcbAuthUtils 보고")
+	void startupReport() {
+		StartupReport report = startupReporters.stream().map(StartupReporter::report)
+											   .filter(item -> item.getName().equals("KcbAuthUtils")).findFirst().orElseThrow();
+		assertThat(report.isReady()).isEqualTo(true);
+		assertThat(report.getDetail()).contains("OkCert jar 있음");
 	}
 }

@@ -15,5 +15,7 @@ dependencies {
     testImplementation 'com.fasterxml.jackson.core:jackson-databind'
     testImplementation testFixtures(project(':modules:webclient'))
     testImplementation 'org.assertj:assertj-core'
+    testImplementation 'org.springframework.boot:spring-boot-test'           // 기동 안내 보고 자동설정 검증
+    testImplementation 'org.springframework.boot:spring-boot-autoconfigure'
     testRuntimeOnly 'ch.qos.logback:logback-classic'
 }

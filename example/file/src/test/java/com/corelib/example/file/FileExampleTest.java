@@ -1,6 +1,7 @@
 // file 예제를 실제 앱으로 띄워 업로드→다운로드→삭제와 위험 확장자·임의 키 차단 검증
 package com.corelib.example.file;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -10,6 +11,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.corelib.common.startup.StartupReport;
+import com.corelib.common.startup.StartupReporter;
+import java.util.List;
 import com.jayway.jsonpath.JsonPath;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -36,6 +40,7 @@ class FileExampleTest {
 	static Path uploadDir;
 
 	private final MockMvc mockMvc;
+	private final List<StartupReporter> startupReporters;
 
 	@DynamicPropertySource
 	static void properties(DynamicPropertyRegistry registry) {
@@ -78,5 +83,14 @@ class FileExampleTest {
 	@DisplayName("발급하지 않은 키(경로 조작 포함)로 다운로드 - 404")
 	void unknownKey() throws Exception {
 		mockMvc.perform(get("/api/files/download").param("key", "../../etc/passwd")).andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("기동 안내 - FileUtils 보고")
+	void startupReport() {
+		StartupReport report = startupReporters.stream().map(StartupReporter::report)
+											   .filter(item -> item.getName().equals("FileUtils")).findFirst().orElseThrow();
+		assertThat(report.isReady()).isEqualTo(true);
+		assertThat(report.getDetail()).contains("local");
 	}
 }

@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: example-crypto
+  output:
+    ansi:
+      enabled: always       # IntelliJ 콘솔에서도 색 표시 (CORE 로고 노란색)
 
 example:
   crypto:

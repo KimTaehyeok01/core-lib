@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: example-mail
+  output:
+    ansi:
+      enabled: always       # IntelliJ 콘솔에서도 색 표시 (CORE 로고 노란색)
   # SMTP — 기본값은 로컬 Mailpit(localhost:1025, 웹 http://localhost:8025)
   # Gmail 예: MAIL_HOST=smtp.gmail.com MAIL_PORT=587 MAIL_SMTP_AUTH=true MAIL_STARTTLS=true + 앱 비밀번호
   mail:
