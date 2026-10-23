@@ -1,4 +1,3 @@
-// SwaggerAutoConfiguration 빈 등록·설정 반영·사용자 빈 우선 검증
 package com.corelib.swagger;
 
 import static org.assertj.core.api.Assertions.assertThat;

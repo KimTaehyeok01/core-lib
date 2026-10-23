@@ -1,4 +1,3 @@
-// Base64 표준/URL-safe 인코딩·디코딩 유틸
 package com.corelib.crypto;
 
 import com.corelib.common.exception.CoreException;

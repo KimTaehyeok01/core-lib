@@ -1,4 +1,3 @@
-// crypto 모듈로 개인정보 컬럼 암호화·이메일 검색 인덱스·비밀번호 해시를 하는 고객 예제 서비스 (고객은 메모리 보관)
 package com.corelib.example.crypto.service;
 
 import com.corelib.common.error.CommonErrorCode;

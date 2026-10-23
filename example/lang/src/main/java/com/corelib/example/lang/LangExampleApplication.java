@@ -1,4 +1,3 @@
-// lang 모듈 사용 예제 앱 (http://localhost:8101)
 package com.corelib.example.lang;
 
 import org.springframework.boot.SpringApplication;

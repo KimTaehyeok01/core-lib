@@ -1,4 +1,3 @@
-// JavaMailSender 기반 메일 발송 진입점 (텍스트/HTML/첨부)
 package com.corelib.mail;
 
 import com.corelib.common.error.CommonErrorCode;

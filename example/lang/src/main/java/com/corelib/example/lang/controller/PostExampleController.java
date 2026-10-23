@@ -1,4 +1,3 @@
-// 비회원 게시판 예제 API
 package com.corelib.example.lang.controller;
 
 import com.corelib.common.response.ApiResponse;

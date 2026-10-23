@@ -1,4 +1,3 @@
-// 토스 결제 예제를 실제 앱으로 띄워 주문 → successUrl 승인 → 취소 전 흐름 검증 (가짜 토스 서버)
 package com.corelib.example.payment.toss;
 
 import static org.assertj.core.api.Assertions.assertThat;

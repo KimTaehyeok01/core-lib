@@ -1,4 +1,3 @@
-// TossPayUtils 로 주문 결제 승인·취소를 처리하는 예제 서비스 (주문은 메모리 보관)
 package com.corelib.example.payment.toss.service;
 
 import com.corelib.common.error.CommonErrorCode;

@@ -1,4 +1,3 @@
-// swagger 예제용 상품 서비스 (메모리 보관)
 package com.corelib.example.swagger.service;
 
 import com.corelib.common.util.ValidateUtils;

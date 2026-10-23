@@ -1,4 +1,3 @@
-// 나이스페이 결제 예제 API + returnUrl 콜백
 package com.corelib.example.payment.nice.controller;
 
 import com.corelib.common.exception.CoreException;

@@ -1,4 +1,3 @@
-// NiceAuthTxSealer 봉인 왕복·만료·다른 키 검증과 NiceAuthProperty 설정 검증
 package com.corelib.auth.nice;
 
 import static org.assertj.core.api.Assertions.assertThat;

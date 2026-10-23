@@ -1,4 +1,3 @@
-// 기동 안내에 FileUtils 초기화 결과(저장소 종류·경로/버킷·크기 상한)를 알리는 자동설정
 package com.corelib.file;
 
 import com.corelib.common.startup.StartupReport;

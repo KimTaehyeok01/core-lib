@@ -1,4 +1,3 @@
-// core.file.storage 값(local/s3)에 맞는 FileStorage 빈을 등록하고 FileUtils 를 초기화하는 자동설정
 package com.corelib.file;
 
 import com.corelib.lang.StringUtils;

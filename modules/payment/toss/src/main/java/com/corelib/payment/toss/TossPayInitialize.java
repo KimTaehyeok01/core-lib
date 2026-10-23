@@ -1,4 +1,3 @@
-// payment.toss.secret-key 가 있으면 Basic 인증·timeout 이 걸린 WebClient 로 TossPayUtils 를 초기화하는 자동설정
 package com.corelib.payment.toss;
 
 import com.corelib.webclient.WebClientUtils;

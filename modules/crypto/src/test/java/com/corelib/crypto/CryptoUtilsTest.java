@@ -1,4 +1,3 @@
-// crypto 유틸 표준 테스트 벡터(SHA-256·HMAC RFC 4231·PBKDF2 RFC 7914)와 AES 왕복·위변조 검증
 package com.corelib.crypto;
 
 import static org.assertj.core.api.Assertions.assertThat;

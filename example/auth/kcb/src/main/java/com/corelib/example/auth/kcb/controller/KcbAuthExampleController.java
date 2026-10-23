@@ -1,4 +1,3 @@
-// KCB 본인확인 예제 API + return_url 콜백
 package com.corelib.example.auth.kcb.controller;
 
 import com.corelib.common.error.CommonErrorCode;

@@ -1,4 +1,3 @@
-// WebClient 생성(timeout)·호출·실패 분류 공통 유틸
 package com.corelib.webclient;
 
 import com.corelib.common.error.CommonErrorCode;

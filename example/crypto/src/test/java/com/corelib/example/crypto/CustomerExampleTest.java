@@ -1,4 +1,3 @@
-// 개인정보 암호화 고객 예제를 실제 앱으로 띄워 가입 → 로그인 → 변경 흐름과 저장 형태(원문 없음) 검증
 package com.corelib.example.crypto;
 
 import static org.assertj.core.api.Assertions.assertThat;

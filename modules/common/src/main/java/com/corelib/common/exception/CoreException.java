@@ -1,4 +1,3 @@
-// ErrorCode 를 담아 던지는 core 공통 런타임 예외 (로그용 식별 데이터를 함께 실을 수 있음)
 package com.corelib.common.exception;
 
 import com.corelib.common.error.ErrorCode;

@@ -1,4 +1,3 @@
-// NICE 통합인증 예제 요청·응답 데이터
 package com.corelib.example.auth.nice.dto;
 
 import java.time.LocalDate;

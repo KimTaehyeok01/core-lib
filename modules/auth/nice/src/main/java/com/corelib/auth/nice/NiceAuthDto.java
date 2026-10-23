@@ -1,4 +1,3 @@
-// NICE 통합인증 요청·응답 데이터 (소비자용 요청/응답 + 벤더 응답)
 package com.corelib.auth.nice;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;

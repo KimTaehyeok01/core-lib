@@ -1,4 +1,3 @@
-// 메일 발송 전용 에러코드
 package com.corelib.mail;
 
 import com.corelib.common.error.ErrorCode;

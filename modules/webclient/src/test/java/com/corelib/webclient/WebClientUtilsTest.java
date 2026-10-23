@@ -1,4 +1,3 @@
-// WebClientUtils 호출과 실패 분류를 실제 로컬 서버로 검증 (4xx·5xx·응답 timeout·연결 거부)
 package com.corelib.webclient;
 
 import static org.assertj.core.api.Assertions.assertThat;

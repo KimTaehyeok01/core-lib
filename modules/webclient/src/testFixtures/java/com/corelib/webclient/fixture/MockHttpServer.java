@@ -1,4 +1,3 @@
-// 테스트용 로컬 HTTP 서버 - 응답을 순서대로 내주고 받은 요청을 기록한다 (reactor-netty, 추가 의존성 없음)
 package com.corelib.webclient.fixture;
 
 import java.nio.charset.StandardCharsets;

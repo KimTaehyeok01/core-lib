@@ -1,4 +1,3 @@
-// 기동 안내에 NiceAuthUtils 초기화 결과(인증수단·return_url·접속 주소)를 알리는 자동설정 — 키는 찍지 않는다
 package com.corelib.auth.nice;
 
 import com.corelib.common.startup.StartupReport;

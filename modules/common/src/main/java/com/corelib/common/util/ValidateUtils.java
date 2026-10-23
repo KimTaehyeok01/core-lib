@@ -1,4 +1,3 @@
-// jakarta Bean Validation 어노테이션(@NotBlank 등)으로 요청 객체를 검증하는 유틸
 package com.corelib.common.util;
 
 import com.corelib.common.error.CommonErrorCode;

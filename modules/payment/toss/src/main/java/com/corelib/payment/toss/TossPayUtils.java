@@ -1,4 +1,3 @@
-// 토스페이먼츠 결제 승인/취소/조회 진입점
 package com.corelib.payment.toss;
 
 import com.corelib.common.error.CommonErrorCode;

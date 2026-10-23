@@ -1,4 +1,3 @@
-// StringUtils·CollectionUtils·RandomStringUtils 동작 검증
 package com.corelib.lang;
 
 import static org.assertj.core.api.Assertions.assertThat;

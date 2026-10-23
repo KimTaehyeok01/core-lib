@@ -1,4 +1,3 @@
-// NICE 통합인증 전용 에러코드 (벤더 결과코드는 NICE_{result_code} 로 패스스루)
 package com.corelib.auth.nice;
 
 import com.corelib.common.error.ErrorCode;

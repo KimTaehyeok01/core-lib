@@ -1,4 +1,3 @@
-// Swagger 문서 기본 정보 설정값 (core.swagger.*)
 package com.corelib.swagger;
 
 import java.util.ArrayList;

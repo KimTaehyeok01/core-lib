@@ -1,4 +1,3 @@
-// 컬렉션/맵 null·빈값 처리 공통 유틸
 package com.corelib.lang;
 
 import java.util.Collection;

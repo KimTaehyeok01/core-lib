@@ -1,4 +1,3 @@
-// 파일 저장소 정적 진입점 - 설정된 FileStorage(로컬/S3)에 위임
 package com.corelib.file;
 
 import com.corelib.common.error.CommonErrorCode;

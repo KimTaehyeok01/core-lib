@@ -1,4 +1,3 @@
-// NiceAuthUtils 본인인증 결과로 회원 가입·로그인을 처리하는 예제 서비스 (회원은 메모리 보관)
 package com.corelib.example.auth.nice.service;
 
 import com.corelib.auth.nice.NiceAuthDto;

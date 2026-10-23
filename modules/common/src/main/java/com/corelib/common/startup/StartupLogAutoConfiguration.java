@@ -1,4 +1,3 @@
-// core.startup-log.enabled(기본 true)면 기동 안내 출력기를 등록하는 자동설정
 package com.corelib.common.startup;
 
 import org.springframework.beans.factory.ObjectProvider;

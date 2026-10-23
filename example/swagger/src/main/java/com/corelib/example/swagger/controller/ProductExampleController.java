@@ -1,4 +1,3 @@
-// swagger 예제 API — @Tag·@Operation·@SecurityRequirement 로 문서화
 package com.corelib.example.swagger.controller;
 
 import com.corelib.common.response.ApiResponse;

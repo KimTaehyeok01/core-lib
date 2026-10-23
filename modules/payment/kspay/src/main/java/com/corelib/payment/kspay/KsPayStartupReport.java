@@ -1,4 +1,3 @@
-// 기동 안내에 KsPayUtils 초기화 결과(상점아이디·승인/취소 주소·취소 키 유무)를 알리는 자동설정 — 키는 찍지 않는다
 package com.corelib.payment.kspay;
 
 import com.corelib.lang.StringUtils;

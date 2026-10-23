@@ -1,4 +1,3 @@
-// KcbAuthUtils 팝업 시작·결과 확인 검증 (가짜 OkCert 클래스로 실제 리플렉션 호출 경로 사용)
 package com.corelib.auth.kcb;
 
 import static org.assertj.core.api.Assertions.assertThat;

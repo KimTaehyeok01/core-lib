@@ -1,4 +1,3 @@
-// 비밀값에서 키를 유도하는 PBKDF2-HmacSHA256 유틸
 package com.corelib.crypto;
 
 import com.corelib.common.exception.CoreException;

@@ -1,4 +1,3 @@
-// S3FileStorage 업로드/다운로드/삭제/presigned URL 검증 (메모리 가짜 S3Client 사용)
 package com.corelib.file;
 
 import static org.assertj.core.api.Assertions.assertThat;

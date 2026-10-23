@@ -9,15 +9,14 @@
 
 ## 시작하기 — 새 프로젝트에 붙이는 3단계
 
-1. **의존성** — 필요한 모듈만 (좌표는 아래 [모듈 좌표](#모듈-좌표-artifactid))
+1. **의존성** — 필요한 모듈만 ([모듈 목록](#모듈-목록), 저장소 설정은 [설치](#설치))
    ```groovy
-   repositories { maven { url 'https://jitpack.io' } }
    dependencies {
-       implementation 'com.github.KimTaehyeok01.core-lib:common:v0.1.0'
-       implementation 'com.github.KimTaehyeok01.core-lib:payment-toss:v0.1.0'
+       implementation 'com.corelib:common:0.1.0'
+       implementation 'com.corelib:payment-toss:0.1.0'
    }
    ```
-2. **yml** — 모듈별 설정(키는 `${환경변수}` 로만). 아래 [모듈별 사용법](#모듈별-사용법) 또는 `example/{모듈}/src/main/resources/application.yml`
+2. **yml** — 모듈 README 의 "설정" 절 (키는 `${환경변수}` 로만)
 3. **서비스에서 호출** — `TossPayUtils.confirm(...)` 처럼 static 유틸을 부른다. 흐름은 `example/{모듈}/.../service/` 를 그대로 따라 한다
 
 앱을 실행하면 콘솔의 **기동 안내**에 붙인 모듈의 초기화 결과가 나온다 — `미초기화` 가 보이면 적힌 설정을 넣으면 된다.
@@ -27,10 +26,11 @@
 ```
 core-lib/
 └── modules/
-    ├── lang/        문자열·컬렉션·난수 문자열·개인정보 마스킹 (순수 자바, 최하단)
+    ├── lang/        문자열·컬렉션·난수 문자열·날짜(KST)·개인정보 마스킹 (순수 자바, 최하단)
     ├── common/      공통 예외·에러코드·응답 포맷·전역 예외 핸들러·검증
-    ├── crypto/      AES(GCM/CBC)·HMAC·SHA·Base64(url)·PBKDF2
+    ├── crypto/      AES(GCM/CBC)·RSA·PEM·SEED·HMAC·SHA·Hex·Base64(url)·PBKDF2
     ├── webclient/   외부 API 호출 (WebClient + timeout + 결과확정/불명 분류)
+    ├── web/         서블릿 웹 공통 — 클라이언트 IP·traceId·요청 로그·비동기 MDC·Security 기본 체인·헬스체크
     ├── swagger/     Swagger/OpenAPI 자동 설정
     ├── mail/        메일 발송
     ├── file/        파일 업로드/다운로드 (로컬 / S3)
@@ -45,7 +45,7 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 ```
 
 `modules`, `auth`, `payment` 는 묶는 폴더이고 그 안의 폴더가 실제 모듈이다.
-의존 방향: `lang` ← `common` ← (`crypto`, `webclient`, swagger, mail, file) ← 벤더 모듈(auth/*, payment/*).
+의존 방향: `lang` ← `common` ← (`crypto`, `webclient`, `web`, swagger, mail, file) ← 벤더 모듈(auth/*, payment/*).
 
 ## 예제 (example/)
 
@@ -71,6 +71,7 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 | `example/payment/toss` | 8110 | SDK v2 결제창 → successUrl 승인 → 취소 | `TOSS_CLIENT_KEY`, `TOSS_SECRET_KEY` |
 | `example/payment/nice` | 8111 | `AUTHNICE.requestPay` → returnUrl 검증·승인 → 취소 | `NICEPAY_CLIENT_KEY`, `NICEPAY_SECRET_KEY` |
 | `example/payment/kspay` | 8112 | 통합모듈 결제창 → rcv → 승인 → webfep 취소 | 기본 테스트 상점, 취소는 `KSPAY_API_KEY` |
+| `example/web` | 8113 | 고객 문의 접수 (IP 별 제한·추적번호·관리자 API) | 관리자 API 는 `ADMIN_API_KEY` |
 
 각 예제 폴더의 `README.md` 에 흐름과 "소비 프로젝트에 옮길 것"이 있다.
 
@@ -86,199 +87,25 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 - 개인정보(이름·CI·DI·휴대폰·카드번호·이메일)는 로그·예외 메시지에 남기지 않는다.
 - 코드는 공개 스펙(벤더 공식 문서·공개 샘플) 기준으로 새로 작성했다. 특정 회사의 사내 연동 코드는 포함하지 않는다.
 
-## 모듈별 사용법
+## 모듈 목록
 
-### lang / common — 기본 유틸, 응답 포맷과 예외
+모듈마다 README 에 의존성·설정·사용법·에러코드·주의가 있다.
 
-```java
-StringUtils.isBlank(value);  CollectionUtils.isEmpty(list);  RandomStringUtils.randomNumeric(6);
-MaskingUtils.name("홍길동");  MaskingUtils.mobile("01012345678");  MaskingUtils.email("user@example.com");  // 홍*동 · 010-****-5678 · us**@example.com
-throw new CoreException(CommonErrorCode.NOT_FOUND).addErrorLogData("orderId", orderId);  // → 404 ApiResponse
-return ApiResponse.success(data);
-ValidateUtils.validate(request);                                                          // jakarta 어노테이션 검증
-```
-웹 앱이면 전역 예외 핸들러(`CoreExceptionHandler`)가 자동 등록된다 — `CoreException` 은 담긴 코드·상태로, Spring MVC 요청 오류(깨진 JSON·파라미터 누락·405·없는 경로)는 C400/C404/C405 로, 그 외는 내부 메시지를 숨기고 C500 으로.
-
-**기동 안내** — 앱이 뜨면 콘솔에 노란 CORE 로고, 실행 주소(Local·Network·Swagger), 붙인 모듈의 초기화 결과가 한 번 찍힌다.
-키가 없어 꺼진 모듈은 `미초기화 — payment.toss.secret-key 미설정` 처럼 무엇을 넣으면 되는지 알려준다(키·비밀번호는 찍지 않는다).
-```yaml
-core:
-  startup-log:
-    enabled: true          # false 면 출력 안 함
-spring:
-  output:
-    ansi:
-      enabled: always      # IntelliJ 일반 실행에서도 색 표시
-```
-
-### crypto
-
-```java
-byte[] key = AesUtils.generateKey(32);
-byte[] sealed = AesUtils.encryptWithIv(plain, key, AesUtils.Mode.GCM);         // IV || 암호문
-byte[] plain  = AesUtils.decryptWithIv(sealed, key, AesUtils.Mode.GCM, 12);
-String sig = HashUtils.sha256Hex(text);   byte[] mac = HmacUtils.hmacSha256(key, message);
-HmacUtils.isEqual(expected, actual);       // 서명 비교는 항상 상수 시간
-```
-
-### webclient
-
-```java
-WebClient client = WebClientUtils.builder("https://api.vendor.com", Duration.ofSeconds(5), Duration.ofSeconds(30)).build();
-Result r = WebClientUtils.post(client, "/v1/items/{id}", h -> h.setBearerAuth(token), body, Result.class, id).block();
-// 실패 분류: WebClientUtils.classify(e) → REJECTED(4xx) / NOT_SENT(연결 실패) / UNKNOWN(timeout·5xx)
-```
-- MVC 앱은 `.block()`, WebFlux 앱은 Mono 를 그대로 조합한다(이벤트 루프에서 `.block()` 금지).
-- 테스트용 로컬 HTTP 서버 `MockHttpServer` 를 testFixtures 로 제공한다 — `testImplementation testFixtures(project(':modules:webclient'))`.
-
-### payment/toss — 토스페이먼츠
-
-```yaml
-payment:
-  toss:
-    secret-key: ${TOSS_SECRET_KEY}     # test_sk_... / live_sk_...
-```
-```java
-TossPayDto.Payment payment = TossPayUtils.confirm(TossPayDto.ConfirmRequest.builder()
-    .paymentKey(paymentKey).orderId(orderId).amount(expectedAmount).build());
-TossPayUtils.cancel(payment.getPaymentKey(), TossPayDto.CancelRequest.builder().cancelReason("고객 변심").build());
-```
-- 결과불명이면 조회 API 로 실제 상태를 재확인한다. 가상계좌는 `isWaitingForDeposit()`.
-
-### payment/nice — 나이스페이먼츠 (Server 승인)
-
-```yaml
-payment:
-  nice:
-    client-key: ${NICEPAY_CLIENT_KEY}
-    secret-key: ${NICEPAY_SECRET_KEY}
-    base-url: https://sandbox-api.nicepay.co.kr   # 운영은 생략
-```
-```java
-// returnUrl 컨트롤러 (@ModelAttribute NicePayDto.AuthResult authResult)
-String tid = NicePayUtils.verifyAuthResult(authResult, expectedOrderId, expectedAmount);
-NicePayDto.Payment payment = NicePayUtils.approve(NicePayDto.ApproveRequest.builder()
-    .tid(tid).orderId(expectedOrderId).amount(expectedAmount).build());
-```
-- 승인 결과불명이면 매뉴얼 지침대로 **자동 망취소**(`NET_CANCELLED`). 망취소까지 실패하면 `RESULT_UNKNOWN`(관리자 확인).
-
-### payment/kspay — KSNET KSPAY
-
-```yaml
-payment:
-  kspay:
-    mid: ${KSPAY_MID}                  # 상점아이디
-    api-key: ${KSPAY_API_KEY}          # webfep pgapi 키 (KSTA > PG상점정보) — 취소에만 필요
-    webfep-base-url: https://paydev.ksnet.co.kr   # 개발 서버, 운영은 생략(pay.ksnet.co.kr)
-```
-```java
-// 결제창 콜백(reCommConId)으로 승인 — 통합모듈 web_host
-KsPayDto.Approval approval = KsPayUtils.approve(KsPayDto.ApproveRequest.builder()
-    .payKey(reCommConId).orderNo(expectedOrderNo).amount(expectedAmount).channel(KsPayDto.Channel.PC).build());
-// 취소 — webfep (카드/계좌이체 부분취소 가능, 가상계좌는 미입금 회수)
-KsPayUtils.cancel(KsPayDto.CancelRequest.builder()
-    .payMethod(approval.getPayMethod()).tradeKeyType(KsPayDto.TradeKeyType.TID).tradeKey(approval.getTid()).build());
-```
-- 승인 응답은 상점아이디·주문번호·금액을 대조한다. 결과불명이면 같은 결제키로 1회 재전송해 결과를 다시 받는다(webfep 에 조회 API 가 없음).
-- 취소 성공은 `code=A0200` **그리고** `respCode` 가 0 으로만 이뤄졌을 때(카드 `0000`, 계좌이체 `000`). A0500·A0999 는 결과불명.
-
-### auth/nice — NICE 통합인증
-
-```yaml
-auth:
-  nice:
-    client-id: ${NICE_CLIENT_ID}
-    client-secret: ${NICE_CLIENT_SECRET}
-    return-url: https://my.domain/nice/return
-    svc-types: [M]                     # M 휴대폰 / F 금융인증서 / I 아이핀 / U 공동인증서 (계약된 것만)
-```
-```java
-NiceAuthDto.VerificationResponse start = NiceAuthUtils.verification(null);   // authUrl 을 브라우저에서 window.open
-// return-url 컨트롤러: ?web_transaction_id=...
-NiceAuthDto.VerificationConfirmResponse person = NiceAuthUtils.verificationConfirm(
-    NiceAuthDto.VerificationConfirmRequest.builder().txNo(start.getTxNo()).webTransactionId(webTransactionId).build());
-```
-- 서버 저장 없이 두 단계 사이 상태를 봉인된 `txNo` 로 넘긴다(10분 유효, 1회 사용).
-
-### auth/kcb — KCB 휴대폰 본인확인 (OkCert3 팝업)
-
-```yaml
-auth:
-  kcb:
-    cp-cd: ${KCB_CP_CD}                        # 회원사코드 12자리
-    license-path: /secure/kcb/V..._license.dat # KCB 가 준 라이선스 파일 (저장소에 넣지 않는다)
-    return-url: https://my.domain/kcb/return
-    site-name: 내 서비스
-    site-url: my.domain
-```
-```groovy
-// 소비 앱: 계약 후 받은 KCB jar 를 추가
-implementation files('libs/OkCert3-java1.5-2.2.3.jar')
-```
-```java
-KcbAuthDto.StartResponse start = KcbAuthUtils.start(null);   // start.formFields() 를 start.getPopupUrl() 로 자동 POST
-// return-url 컨트롤러: ?mdl_tkn=...
-KcbAuthDto.ConfirmResponse person = KcbAuthUtils.confirm(KcbAuthDto.ConfirmRequest.builder().mdlTkn(mdlTkn).build());
-```
-- KCB jar 는 공개 배포되지 않아 코어는 `kcb.module.v3.OkCert` 를 리플렉션으로 호출한다. jar 가 없으면 `MODULE_NOT_FOUND`.
-
-### file — 로컬 / S3
-
-```yaml
-core:
-  file:
-    storage: local                     # 또는 s3 (software.amazon.awssdk:s3 의존성 추가 필요)
-    max-size: 10MB
-    allowed-extensions: [png, jpg, pdf]
-    s3:
-      bucket: my-bucket
-```
-```java
-FileDto.StoredFile stored = FileUtils.upload("profile", multipartFile);   // DB 에는 stored.getKey() 저장
-String url = FileUtils.getUrl(stored.getKey());                           // S3 는 만료되는 presigned URL
-```
-- 경로 탈출(`../`)·웹셸 확장자(jsp/php 등, 대소문자·이중확장자 포함)는 항상 차단, svg/html/js 는 허용 목록에 명시해야만 허용.
-
-### mail
-
-```yaml
-spring:
-  mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
-core:
-  mail:
-    from: noreply@my.domain
-```
-```java
-MailUtils.sendText("user@example.com", "가입 안내", "환영합니다");
-MailUtils.sendHtml("user@example.com", "인증코드", "<b>123456</b>");
-MailUtils.send(MailDto.SendRequest...);   // 참조·숨은참조·첨부
-```
-
-### swagger
-
-```yaml
-core:
-  swagger:
-    title: 주문 API
-    version: v1
-```
-JWT 보안 스킴 `bearerAuth` 가 등록된다 — 컨트롤러에 `@SecurityRequirement(name = SwaggerAutoConfiguration.BEARER_SCHEME)`.
-
-공통 에러 응답을 yml 로 켜고 끈다 — 예시 본문은 전역 핸들러와 같은 `ApiResponse`(C400·C404…).
-```yaml
-core:
-  swagger:
-    error-responses:
-      enabled: true              # 한 줄로 켜고 끄기
-      codes: [400, 404, 500]     # 모든 API
-      secured-codes: [401, 403]  # @SecurityRequirement API 에만
-```
-- 컨트롤러에 직접 적은 `@ApiResponse` 코드는 덮어쓰지 않는다
-- UI 기본값으로 API 목록 접힘(`doc-expansion: none`), Schemas 숨김(`default-models-expand-depth: -1`) — yml 에 같은 키를 적으면 그 값이 우선
+| 모듈 | artifactId | 내용 | 계약 필요 |
+|------|-----------|------|-----------|
+| [lang](modules/lang) | `lang` | 문자열·컬렉션·난수·날짜(KST)·마스킹 | - |
+| [common](modules/common) | `common` | ApiResponse·CoreException·전역 예외 핸들러·검증·기동 안내 | - |
+| [crypto](modules/crypto) | `crypto` | AES·RSA·PEM·SEED·HMAC·SHA·PBKDF2 | - |
+| [webclient](modules/webclient) | `webclient` | 외부 API 호출 + 실패 분류 + MockHttpServer | - |
+| [web](modules/web) | `web` | 클라이언트 IP·traceId·요청 로그·Security·헬스체크 | - |
+| [swagger](modules/swagger) | `swagger` | OpenAPI 자동 설정·공통 에러 응답 | - |
+| [mail](modules/mail) | `mail` | SMTP 메일 발송 | - |
+| [file](modules/file) | `file` | 로컬·S3 파일 저장 | - |
+| [auth/nice](modules/auth/nice) | `auth-nice` | NICE 통합인증 본인확인 | NICE |
+| [auth/kcb](modules/auth/kcb) | `auth-kcb` | KCB 휴대폰 본인확인 | KCB (jar·라이선스) |
+| [payment/toss](modules/payment/toss) | `payment-toss` | 토스페이먼츠 | 가입만 (테스트 키) |
+| [payment/nice](modules/payment/nice) | `payment-nice` | 나이스페이먼츠 | 가입만 (샌드박스) |
+| [payment/kspay](modules/payment/kspay) | `payment-kspay` | KSNET KSPAY | 테스트 상점 공개, 취소는 계약 |
 
 ## 주의
 
@@ -292,40 +119,58 @@ core:
 | static 설정 | Utils 는 설정·도구를 static 으로 든다 — 한 JVM 에 Spring 앱을 둘 이상 띄우면 나중에 뜬 쪽 설정이 이긴다(일반 서비스는 무관) |
 | JitPack | `jitpack.yml` 은 있으나 release 태그로 실제 빌드해 본 적은 아직 없다 |
 
-## 모듈 좌표 (artifactId)
+## 설치
 
-| 모듈 | gradle 경로 | artifactId |
-|------|-------------|-----------|
-| 기본 유틸 | `:modules:lang` | `lang` |
-| 공통 | `:modules:common` | `common` |
-| 암호화 | `:modules:crypto` | `crypto` |
-| WebClient | `:modules:webclient` | `webclient` |
-| Swagger | `:modules:swagger` | `swagger` |
-| 메일 | `:modules:mail` | `mail` |
-| 파일 | `:modules:file` | `file` |
-| 본인인증 NICE | `:modules:auth:nice` | `auth-nice` |
-| 본인인증 KCB | `:modules:auth:kcb` | `auth-kcb` |
-| 결제 토스 | `:modules:payment:toss` | `payment-toss` |
-| 결제 NICE | `:modules:payment:nice` | `payment-nice` |
-| 결제 KSPAY | `:modules:payment:kspay` | `payment-kspay` |
+빌드 설정의 그룹은 `com.corelib`, 버전은 `0.1.0` 이다. 의존성 좌표는 `com.corelib:{artifactId}:0.1.0`.
 
-### 로컬 테스트 (mavenLocal)
-
+### 내 PC 에서 바로 (mavenLocal)
 ```bash
 ./gradlew publishToMavenLocal
 ```
 ```groovy
-repositories { mavenLocal() }
-dependencies { implementation 'com.corelib:payment-toss:0.1.0' }
+repositories { mavenLocal(); mavenCentral() }
 ```
+이 PC 에서만 동작한다 — 다른 PC·배포 서버에서 빌드하려면 아래 원격 저장소가 필요하다.
 
-### 공개 배포 (JitPack)
+### GitHub Packages (다른 PC·서버에서 쓰기)
+의존성 줄에는 `com.corelib:{artifactId}:0.1.0` 만 보인다. 저장소 주소에만 계정 이름이 들어간다(GitHub Packages 규칙).
 
-GitHub 레포(https://github.com/KimTaehyeok01/core-lib)에서 **Releases → Create a new release** 로 태그(예: `v0.1.0`)를 만들면
-JitPack 이 그 시점 코드를 빌드해 배포한다(`jitpack.yml` 로 JDK 17 지정). 첫 빌드는 jitpack.io 에서 저장소를 조회하면 시작된다.
-멀티 모듈이라 좌표는 `com.github.{GitHub 계정}.{저장소}:{artifactId}:{태그}` 이다.
+**1. 토큰 만들기** — GitHub → Settings → Developer settings → Personal access tokens → **Tokens (classic)**
+- 올리는 PC: `write:packages` (`read:packages` 포함)
+- 받기만 하는 PC·서버: `read:packages`
+- GitHub Packages 의 Maven 저장소는 classic 토큰만 된다. 공개 레포여도 받을 때 토큰이 필요하다.
 
+**2. 토큰 저장** — 코드·레포에 넣지 않는다. `~/.gradle/gradle.properties` (윈도우 `C:\Users\{사용자}\.gradle\gradle.properties`)
+```properties
+gpr.user=GitHub아이디
+gpr.key=발급받은토큰
+```
+또는 환경변수 `GITHUB_ACTOR`, `GITHUB_TOKEN` (CI 에서는 이쪽).
+
+**3. 올리기** (core-lib 에서, 버전을 올릴 때마다)
+```bash
+./gradlew publish
+```
+- 같은 버전은 다시 올릴 수 없다 — 고쳤으면 루트 `build.gradle` 의 `version` 을 올린다 (0.1.0 → 0.1.1).
+- 올릴 코드는 main 에 합친 뒤 올리는 것을 권장한다.
+
+**4. 쓰는 프로젝트** (`build.gradle`)
 ```groovy
-repositories { maven { url 'https://jitpack.io' } }
-dependencies { implementation 'com.github.KimTaehyeok01.core-lib:payment-toss:v0.1.0' }
+repositories {
+    mavenCentral()
+    maven {
+        url = uri('https://maven.pkg.github.com/KimTaehyeok01/core-lib')
+        credentials {
+            username = findProperty('gpr.user') ?: System.getenv('GITHUB_ACTOR')
+            password = findProperty('gpr.key') ?: System.getenv('GITHUB_TOKEN')
+        }
+    }
+}
+dependencies {
+    implementation 'com.corelib:common:0.1.0'
+    implementation 'com.corelib:payment-toss:0.1.0'
+}
 ```
+
+### JitPack (참고)
+JitPack 을 쓰면 좌표가 `com.github.KimTaehyeok01.core-lib:{artifactId}:{태그}` 로 바뀐다 (토큰 없이 받을 수 있지만 그룹에 계정 이름이 들어간다). `jitpack.yml` 은 남겨 두었다.

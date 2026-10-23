@@ -1,4 +1,3 @@
-// 이메일 인증코드 예제 요청·응답 데이터
 package com.corelib.example.mail.dto;
 
 import jakarta.validation.constraints.Email;

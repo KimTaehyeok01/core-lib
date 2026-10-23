@@ -1,4 +1,3 @@
-// NICE 요청 파라미터 생성·검증 (request_no 채번, 콜백 URL 검사, 인증 수단 결정)
 package com.corelib.auth.nice;
 
 import com.corelib.common.error.CommonErrorCode;

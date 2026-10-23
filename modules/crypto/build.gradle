@@ -1,7 +1,8 @@
-// crypto: 암호화 공통 유틸 (AES-GCM/CBC, HMAC, SHA, Base64(url), PBKDF2) — JDK 표준 API 만 사용
+// crypto: 암호화 공통 유틸 (AES-GCM/CBC, RSA, PEM, SEED, HMAC, SHA, Hex, Base64(url), PBKDF2) — SEED·PKCS#1 만 BouncyCastle
 
 dependencies {
     api project(':modules:common')
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.86'    // SEED 엔진·PKCS#1 키 해석 (2026-09-11, OSV 0건)
 
     testImplementation 'org.assertj:assertj-core'
 }

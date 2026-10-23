@@ -1,4 +1,3 @@
-// swagger 예제를 실제 앱으로 띄워 OpenAPI 문서(제목·보안 스킴·자물쇠 API) 검증
 package com.corelib.example.swagger;
 
 import static org.assertj.core.api.Assertions.assertThat;

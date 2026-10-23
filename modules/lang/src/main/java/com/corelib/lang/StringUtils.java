@@ -1,4 +1,3 @@
-// 문자열 null/공백 처리 공통 유틸
 package com.corelib.lang;
 
 public final class StringUtils {

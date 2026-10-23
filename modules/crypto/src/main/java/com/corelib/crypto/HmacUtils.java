@@ -1,4 +1,3 @@
-// HMAC-SHA256 생성과 상수 시간 비교 유틸
 package com.corelib.crypto;
 
 import com.corelib.common.exception.CoreException;

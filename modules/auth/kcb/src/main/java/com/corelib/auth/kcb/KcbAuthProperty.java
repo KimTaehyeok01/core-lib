@@ -1,4 +1,3 @@
-// KCB 휴대폰 본인확인 설정 (auth.kcb.*)
 package com.corelib.auth.kcb;
 
 import com.corelib.common.error.CommonErrorCode;

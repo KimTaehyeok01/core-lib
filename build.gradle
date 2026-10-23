@@ -62,13 +62,25 @@ configure(leafProjects.findAll { it.path.startsWith(':modules:') }) {
         withSourcesJar()          // 소비처/JitPack 에서 소스 열람 가능
     }
 
-    // ./gradlew publishToMavenLocal
+    // ./gradlew publishToMavenLocal  — 이 PC 에만 설치
+    // ./gradlew publish                — GitHub Packages 에 업로드 (좌표 com.corelib:{artifactId}:{version})
     publishing {
         publications {
             mavenJava(MavenPublication) {
                 from components.java
                 // :modules:auth:nice -> auth-nice, :modules:common -> common (중첩 모듈 artifactId 충돌 방지)
                 artifactId = project.path.replaceFirst('^:modules:', '').replace(':', '-')
+            }
+        }
+        repositories {
+            maven {
+                name = 'GitHubPackages'
+                url = uri('https://maven.pkg.github.com/KimTaehyeok01/core-lib')
+                // 토큰은 코드에 두지 않는다 — ~/.gradle/gradle.properties(gpr.user·gpr.key) 또는 환경변수(GITHUB_ACTOR·GITHUB_TOKEN)
+                credentials {
+                    username = findProperty('gpr.user') ?: System.getenv('GITHUB_ACTOR')
+                    password = findProperty('gpr.key') ?: System.getenv('GITHUB_TOKEN')
+                }
             }
         }
     }

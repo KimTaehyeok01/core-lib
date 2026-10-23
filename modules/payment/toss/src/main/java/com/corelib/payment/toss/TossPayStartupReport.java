@@ -1,4 +1,3 @@
-// 기동 안내에 TossPayUtils 초기화 결과(키 종류·접속 주소·timeout)를 알리는 자동설정 — 시크릿 키는 찍지 않는다
 package com.corelib.payment.toss;
 
 import com.corelib.common.startup.StartupReport;

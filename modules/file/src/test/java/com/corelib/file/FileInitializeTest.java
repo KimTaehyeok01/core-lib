@@ -1,4 +1,3 @@
-// FileInitialize 의 저장소 선택(local/s3)·사용자 빈 우선·FileUtils 초기화 검증
 package com.corelib.file;
 
 import static org.assertj.core.api.Assertions.assertThat;

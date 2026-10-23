@@ -1,4 +1,3 @@
-// lang 유틸로 입력값 정리·공유코드 발급·작성자 마스킹을 하는 게시판 예제 서비스 (글은 메모리 보관)
 package com.corelib.example.lang.service;
 
 import com.corelib.common.error.CommonErrorCode;

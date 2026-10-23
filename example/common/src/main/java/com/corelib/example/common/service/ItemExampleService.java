@@ -1,4 +1,3 @@
-// common 모듈의 예외·검증 사용 패턴을 보여주는 상품 예제 서비스 (메모리 보관)
 package com.corelib.example.common.service;
 
 import com.corelib.common.error.CommonErrorCode;

@@ -1,4 +1,3 @@
-// file 예제 API (업로드·목록·다운로드·삭제)
 package com.corelib.example.file.controller;
 
 import com.corelib.common.response.ApiResponse;

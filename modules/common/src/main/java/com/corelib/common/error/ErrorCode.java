@@ -1,4 +1,3 @@
-// 모든 에러코드가 구현하는 공통 계약 (코드/메시지/HTTP 상태)
 package com.corelib.common.error;
 
 public interface ErrorCode {

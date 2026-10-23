@@ -1,4 +1,3 @@
-// 공통 에러 응답 — 공개 API 는 codes 만, 인증 API 는 secured-codes 까지, 직접 적은 응답은 유지하는지 검증
 package com.corelib.swagger;
 
 import static org.assertj.core.api.Assertions.assertThat;

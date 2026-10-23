@@ -1,4 +1,3 @@
-// NICE 인증 결과 키 유도·무결성 검증·복호화 (공식 가이드 '3. 중요 정보 보안' 규칙)
 package com.corelib.auth.nice;
 
 import com.corelib.common.exception.CoreException;

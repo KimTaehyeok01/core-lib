@@ -1,4 +1,3 @@
-// 개인정보 암호화 고객 예제 요청·응답 데이터
 package com.corelib.example.crypto.dto;
 
 import jakarta.validation.constraints.Email;

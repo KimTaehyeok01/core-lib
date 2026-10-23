@@ -1,4 +1,3 @@
-// CoreException 과 미처리 예외를 ApiResponse 형식으로 변환하는 전역 핸들러
 package com.corelib.common.exception;
 
 import com.corelib.common.error.CommonErrorCode;

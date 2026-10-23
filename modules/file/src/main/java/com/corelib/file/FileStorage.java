@@ -1,4 +1,3 @@
-// 파일 저장소 공통 계약 (로컬/S3 구현을 같은 방식으로 사용)
 package com.corelib.file;
 
 import com.corelib.common.exception.CoreException;

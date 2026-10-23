@@ -1,4 +1,3 @@
-// NICEPAY 위변조 검증 서명 계산·비교 (hex(sha256(...)))
 package com.corelib.payment.nice;
 
 import com.corelib.crypto.HashUtils;

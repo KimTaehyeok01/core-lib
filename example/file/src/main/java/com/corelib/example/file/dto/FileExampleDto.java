@@ -1,4 +1,3 @@
-// file 예제 요청·응답 데이터
 package com.corelib.example.file.dto;
 
 import jakarta.validation.constraints.NotBlank;

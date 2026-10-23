@@ -1,4 +1,3 @@
-// 파일 저장소 설정 (core.file.*)
 package com.corelib.file;
 
 import java.time.Duration;

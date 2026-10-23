@@ -1,4 +1,3 @@
-// 기동 안내에 Swagger UI 주소를 알리는 자동설정
 package com.corelib.swagger;
 
 import com.corelib.common.startup.StartupReport;

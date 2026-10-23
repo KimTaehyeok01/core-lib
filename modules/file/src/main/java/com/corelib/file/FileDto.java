@@ -1,4 +1,3 @@
-// 파일 업로드 결과 데이터
 package com.corelib.file;
 
 import lombok.AccessLevel;

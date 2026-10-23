@@ -1,4 +1,3 @@
-// 토스 결제 예제 API + successUrl/failUrl 콜백
 package com.corelib.example.payment.toss.controller;
 
 import com.corelib.common.exception.CoreException;

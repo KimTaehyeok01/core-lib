@@ -1,4 +1,3 @@
-// 토스페이먼츠 연동 전용 에러코드
 package com.corelib.payment.toss;
 
 import com.corelib.common.error.ErrorCode;

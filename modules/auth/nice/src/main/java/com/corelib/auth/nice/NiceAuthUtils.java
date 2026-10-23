@@ -1,4 +1,3 @@
-// NICE 통합인증(본인확인) 진입점 - 인증 요청과 결과 확인 2단계
 package com.corelib.auth.nice;
 
 import com.corelib.common.error.CommonErrorCode;

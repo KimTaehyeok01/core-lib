@@ -1,4 +1,3 @@
-// URL 스킴 검증 유틸 - 외부 연동 호스트의 TLS 강제 (로컬 테스트 서버만 http 허용)
 package com.corelib.common.util;
 
 import java.net.URI;

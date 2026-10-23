@@ -1,4 +1,3 @@
-// 로컬 실행용 가짜 택배사 API (/fake-courier/**) — 실서비스에는 없다
 package com.corelib.example.webclient.controller;
 
 import com.corelib.example.webclient.dto.ShipmentExampleDto;

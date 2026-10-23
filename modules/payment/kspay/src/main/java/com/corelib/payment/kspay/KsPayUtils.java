@@ -1,4 +1,3 @@
-// KSPAY 결제 승인(통합모듈)/취소(webfep) 진입점
 package com.corelib.payment.kspay;
 
 import com.corelib.common.error.CommonErrorCode;

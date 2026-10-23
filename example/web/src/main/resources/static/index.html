@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- web 예제 화면: 고객 문의 접수(공개) + 관리자 목록(X-Admin-Key) -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>고객 문의 예제</title>
+<style>
+	body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+	label { display: block; margin-top: 12px; font-weight: bold; }
+	input, textarea { width: 100%; padding: 8px; box-sizing: border-box; }
+	button { margin-top: 12px; padding: 10px 20px; }
+	table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+	td, th { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+	.error { color: #c00; }
+	.ok { color: #070; }
+</style>
+</head>
+<body>
+<h1>고객 문의</h1>
+<form id="inquiryForm">
+	<label for="name">이름</label>
+	<input id="name" required maxlength="30" value="홍길동">
+	<label for="email">이메일</label>
+	<input id="email" type="email" required value="hong@example.com">
+	<label for="content">내용</label>
+	<textarea id="content" rows="4" required>결제가 두 번 된 것 같아요.</textarea>
+	<button type="submit">문의하기</button>
+</form>
+<p id="message"></p>
+
+<h2>관리자</h2>
+<label for="adminKey">관리자 키 (ADMIN_API_KEY)</label>
+<input id="adminKey" type="password" autocomplete="off">
+<button id="loadButton">문의 목록</button>
+<p id="adminMessage"></p>
+<table id="list" hidden>
+	<thead><tr><th>번호</th><th>이름</th><th>이메일</th><th>IP</th><th>추적번호</th><th>상태</th><th>접수</th></tr></thead>
+	<tbody></tbody>
+</table>
+
+<script>
+	function show(element, text, isError) {
+		element.className = isError ? 'error' : 'ok';
+		element.textContent = text;
+	}
+
+	document.getElementById('inquiryForm').addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const body = await (await fetch('/api/inquiries/create', {
+			method: 'POST',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify({
+				name: document.getElementById('name').value,
+				email: document.getElementById('email').value,
+				content: document.getElementById('content').value
+			})
+		})).json();
+		const message = document.getElementById('message');
+		body.success
+			? show(message, '접수 완료 — 문의번호 ' + body.data.inquiryNo + ', 추적번호 ' + body.data.traceId, false)
+			: show(message, '[' + body.code + '] ' + body.message, true);
+	});
+
+	document.getElementById('loadButton').addEventListener('click', async () => {
+		const body = await (await fetch('/api/admin/inquiries/list', {
+			headers: {'X-Admin-Key': document.getElementById('adminKey').value}
+		})).json();
+		const message = document.getElementById('adminMessage');
+		const table = document.getElementById('list');
+		if (!body.success) {
+			table.hidden = true;
+			show(message, '[' + body.code + '] ' + body.message, true);
+			return;
+		}
+		show(message, body.data.length + '건', false);
+		const rows = table.querySelector('tbody');
+		rows.replaceChildren();
+		body.data.forEach((item) => {
+			const row = document.createElement('tr');
+			[item.inquiryNo, item.maskedName, item.maskedEmail, item.clientIp, item.traceId, item.status, item.receivedAt].forEach((value) => {
+				const cell = document.createElement('td');
+				cell.textContent = value ?? '-';
+				row.append(cell);
+			});
+			rows.append(row);
+		});
+		table.hidden = false;
+	});
+</script>
+</body>
+</html>

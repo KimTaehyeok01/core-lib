@@ -1,4 +1,3 @@
-// 기동 안내에 NicePayUtils 초기화 결과(샌드박스/운영·접속 주소·timeout)를 알리는 자동설정 — 키는 찍지 않는다
 package com.corelib.payment.nice;
 
 import com.corelib.common.startup.StartupReport;

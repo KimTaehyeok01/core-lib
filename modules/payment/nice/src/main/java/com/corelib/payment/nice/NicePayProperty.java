@@ -1,4 +1,3 @@
-// 나이스페이먼츠 연동 설정 (payment.nice.*)
 package com.corelib.payment.nice;
 
 import com.corelib.common.error.CommonErrorCode;

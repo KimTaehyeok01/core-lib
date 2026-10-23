@@ -1,4 +1,3 @@
-// KSPAY 결제 예제 요청·응답 데이터
 package com.corelib.example.payment.kspay.dto;
 
 import com.corelib.payment.kspay.KsPayDto;

@@ -1,4 +1,3 @@
-// KSPAY 결제 예제 API + 결제창 수신(sndReply)·결과 콜백
 package com.corelib.example.payment.kspay.controller;
 
 import com.corelib.common.exception.CoreException;

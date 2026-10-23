@@ -1,4 +1,3 @@
-// CoreExceptionHandler 가 Spring MVC 요청 오류는 4xx, 그 외 예외는 500 으로 바꾸는지 검증
 package com.corelib.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -1,4 +1,3 @@
-// 보안 난수(SecureRandom) 기반 무작위 문자열 생성 유틸
 package com.corelib.lang;
 
 import java.security.SecureRandom;

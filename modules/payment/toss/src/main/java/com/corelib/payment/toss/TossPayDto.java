@@ -1,4 +1,3 @@
-// 토스페이먼츠 승인/취소/조회 요청·응답 데이터
 package com.corelib.payment.toss;
 
 import com.corelib.lang.StringUtils;

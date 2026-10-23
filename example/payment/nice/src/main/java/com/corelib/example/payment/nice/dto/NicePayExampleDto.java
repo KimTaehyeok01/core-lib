@@ -1,4 +1,3 @@
-// 나이스페이 결제 예제 요청·응답 데이터
 package com.corelib.example.payment.nice.dto;
 
 import jakarta.validation.constraints.Max;

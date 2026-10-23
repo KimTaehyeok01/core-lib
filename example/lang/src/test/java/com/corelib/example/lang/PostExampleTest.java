@@ -1,4 +1,3 @@
-// 게시판 예제를 실제 앱으로 띄워 등록 → 목록·상세 → 삭제 흐름과 입력값 정리·마스킹 검증
 package com.corelib.example.lang;
 
 import static org.hamcrest.Matchers.matchesPattern;

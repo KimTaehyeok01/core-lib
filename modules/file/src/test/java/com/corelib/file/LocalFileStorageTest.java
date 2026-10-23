@@ -1,4 +1,3 @@
-// LocalFileStorage 업로드/다운로드/삭제와 보안 검증(경로 탈출·위험 확장자·용량) 검증
 package com.corelib.file;
 
 import static org.assertj.core.api.Assertions.assertThat;

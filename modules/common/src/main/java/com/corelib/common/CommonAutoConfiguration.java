@@ -1,4 +1,3 @@
-// 웹 앱이면 전역 예외 핸들러(CoreExceptionHandler)를 자동 등록하는 자동설정
 package com.corelib.common;
 
 import com.corelib.common.exception.CoreExceptionHandler;

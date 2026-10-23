@@ -1,4 +1,3 @@
-// FileUtils 로 업로드·다운로드·삭제하고 첨부 정보를 보관하는 예제 서비스
 package com.corelib.example.file.service;
 
 import com.corelib.common.error.CommonErrorCode;

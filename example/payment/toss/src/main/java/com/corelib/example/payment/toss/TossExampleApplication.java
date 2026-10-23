@@ -1,4 +1,3 @@
-// 토스페이먼츠 결제 예제 앱 (http://localhost:8110)
 package com.corelib.example.payment.toss;
 
 import org.springframework.boot.SpringApplication;

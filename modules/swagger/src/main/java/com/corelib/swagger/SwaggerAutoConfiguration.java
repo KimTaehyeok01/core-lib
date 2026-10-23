@@ -1,4 +1,3 @@
-// core.swagger 설정으로 기본 OpenAPI 문서(정보 + JWT 보안 스킴)와 공통 에러 응답을 등록하는 자동설정
 package com.corelib.swagger;
 
 import io.swagger.v3.oas.models.Components;

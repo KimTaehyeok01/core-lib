@@ -1,4 +1,3 @@
-// core 전역에서 공통으로 쓰는 기본 에러코드 모음
 package com.corelib.common.error;
 
 public enum CommonErrorCode implements ErrorCode {

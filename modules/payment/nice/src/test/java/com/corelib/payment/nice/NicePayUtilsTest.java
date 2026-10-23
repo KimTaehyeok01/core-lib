@@ -1,4 +1,3 @@
-// NicePayUtils 인증결과 검증·승인·망취소·취소·조회 분기 검증 (로컬 HTTP 서버로 NICEPAY 응답 재현)
 package com.corelib.payment.nice;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -1,4 +1,3 @@
-// UrlUtils https/로컬 http 허용 판정 검증
 package com.corelib.common.util;
 
 import static org.assertj.core.api.Assertions.assertThat;

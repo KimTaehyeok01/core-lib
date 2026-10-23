@@ -1,4 +1,3 @@
-// KCB 휴대폰 본인확인 예제 앱 (http://localhost:8109)
 package com.corelib.example.auth.kcb;
 
 import org.springframework.boot.SpringApplication;

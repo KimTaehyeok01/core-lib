@@ -1,4 +1,3 @@
-// 메일 발송 기본값 설정 (core.mail.*) - SMTP 접속 정보는 표준 spring.mail.* 사용
 package com.corelib.mail;
 
 import lombok.Getter;

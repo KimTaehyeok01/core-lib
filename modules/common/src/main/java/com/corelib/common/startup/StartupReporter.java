@@ -1,4 +1,3 @@
-// 각 모듈이 기동 안내에 자기 초기화 결과를 알리는 인터페이스
 package com.corelib.common.startup;
 
 /**

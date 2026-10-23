@@ -1,4 +1,3 @@
-// 기동 안내 보고 — 키가 있으면 초기화 완료(키 종류·주소, 키 원문 없음), 없으면 미초기화와 필요한 설정을 알리는지 검증
 package com.corelib.payment.toss;
 
 import static org.assertj.core.api.Assertions.assertThat;

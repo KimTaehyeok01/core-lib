@@ -1,4 +1,3 @@
-// crypto 모듈 사용 예제 앱 (http://localhost:8103)
 package com.corelib.example.crypto;
 
 import org.springframework.boot.SpringApplication;

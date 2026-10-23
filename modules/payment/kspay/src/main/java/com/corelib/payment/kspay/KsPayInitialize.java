@@ -1,4 +1,3 @@
-// payment.kspay.mid 가 있으면 승인(통합모듈)·취소(webfep) WebClient 로 KsPayUtils 를 초기화하는 자동설정
 package com.corelib.payment.kspay;
 
 import com.corelib.lang.StringUtils;

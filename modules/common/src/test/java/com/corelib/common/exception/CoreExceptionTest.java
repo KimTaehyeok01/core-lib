@@ -1,4 +1,3 @@
-// CoreException 로그 데이터 체이닝과 벤더 코드 패스스루(ErrorCode.of) 검증
 package com.corelib.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;

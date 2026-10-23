@@ -1,4 +1,3 @@
-// ValidateUtils 어노테이션 검증 결과와 에러코드 검증
 package com.corelib.common.util;
 
 import static org.assertj.core.api.Assertions.assertThatCode;

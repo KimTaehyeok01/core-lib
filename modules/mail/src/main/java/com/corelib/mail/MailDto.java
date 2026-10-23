@@ -1,4 +1,3 @@
-// 메일 발송 요청 데이터 (수신자/참조/숨은참조/제목/본문/첨부)
 package com.corelib.mail;
 
 import jakarta.validation.Valid;

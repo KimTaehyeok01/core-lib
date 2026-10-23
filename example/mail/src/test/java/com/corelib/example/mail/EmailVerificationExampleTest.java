@@ -1,4 +1,3 @@
-// 이메일 인증 예제를 실제 앱으로 띄워 코드 발송(메일 내용) → 확인, 재발송 대기·오입력 폐기 검증 (발송을 가로채는 JavaMailSender)
 package com.corelib.example.mail;
 
 import static org.assertj.core.api.Assertions.assertThat;

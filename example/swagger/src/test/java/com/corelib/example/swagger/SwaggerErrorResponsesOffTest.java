@@ -1,4 +1,3 @@
-// core.swagger.error-responses.enabled=false 한 줄로 공통 에러 응답이 빠지는지 검증
 package com.corelib.example.swagger;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;

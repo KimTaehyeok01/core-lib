@@ -1,4 +1,3 @@
-// 암호화 유틸 전용 에러코드
 package com.corelib.crypto;
 
 import com.corelib.common.error.ErrorCode;

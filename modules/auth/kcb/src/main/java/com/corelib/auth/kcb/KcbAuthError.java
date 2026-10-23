@@ -1,4 +1,3 @@
-// KCB 본인확인 전용 에러코드 (벤더 결과코드는 KCB_{RSLT_CD} 로 패스스루)
 package com.corelib.auth.kcb;
 
 import com.corelib.common.error.ErrorCode;

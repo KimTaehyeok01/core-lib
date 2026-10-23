@@ -1,4 +1,3 @@
-// 로컬 디스크 파일 저장소 (baseDir 밖으로 나가는 경로는 차단)
 package com.corelib.file;
 
 import com.corelib.common.exception.CoreException;

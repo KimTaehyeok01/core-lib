@@ -1,4 +1,3 @@
-// file 모듈 사용 예제 앱 (http://localhost:8107)
 package com.corelib.example.file;
 
 import org.springframework.boot.SpringApplication;

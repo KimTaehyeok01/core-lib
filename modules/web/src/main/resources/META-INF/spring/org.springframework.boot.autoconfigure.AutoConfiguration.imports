@@ -1,0 +1,3 @@
+com.corelib.web.WebInitialize
+com.corelib.web.WebSecurityInitialize
+com.corelib.web.WebStartupReport

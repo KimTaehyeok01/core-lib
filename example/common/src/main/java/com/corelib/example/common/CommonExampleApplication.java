@@ -1,4 +1,3 @@
-// common 모듈 사용 예제 앱 (http://localhost:8102)
 package com.corelib.example.common;
 
 import org.springframework.boot.SpringApplication;

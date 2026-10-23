@@ -1,4 +1,3 @@
-// KCB 휴대폰 본인확인(팝업) 요청·응답 데이터
 package com.corelib.auth.kcb;
 
 import jakarta.validation.constraints.NotBlank;

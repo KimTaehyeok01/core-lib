@@ -1,4 +1,3 @@
-// AWS S3(또는 S3 호환) 파일 저장소 - 접근 URL 은 presigned GET URL
 package com.corelib.file;
 
 import com.corelib.common.error.CommonErrorCode;

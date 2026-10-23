@@ -1,4 +1,3 @@
-// NiceAuthUtils 인증 요청·결과 확인 전 흐름 검증 (로컬 HTTP 서버 + 가이드 규칙대로 독립 구현한 가짜 NICE 암호화)
 package com.corelib.auth.nice;
 
 import static org.assertj.core.api.Assertions.assertThat;

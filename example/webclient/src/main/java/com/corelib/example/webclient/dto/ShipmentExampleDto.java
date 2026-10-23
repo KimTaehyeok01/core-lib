@@ -1,4 +1,3 @@
-// 택배 접수·배송 조회 예제 요청·응답 데이터 (우리 API + 택배사 API 규격)
 package com.corelib.example.webclient.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;

@@ -1,4 +1,3 @@
-// 파일 업로드/다운로드 전용 에러코드
 package com.corelib.file;
 
 import com.corelib.common.error.ErrorCode;

@@ -1,4 +1,3 @@
-// auth.kcb.cp-cd 가 있으면 설정·라이선스를 확인하고 KcbAuthUtils 를 초기화하는 자동설정
 package com.corelib.auth.kcb;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;

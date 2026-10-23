@@ -1,0 +1,18 @@
+// web: 서블릿 웹 앱 공통 — 클라이언트 IP·traceId·요청 로그·비동기 MDC·Security 기본 체인·헬스체크 기본값
+
+dependencies {
+    api project(':modules:common')
+    api 'org.springframework.boot:spring-boot-starter-actuator:3.5.16'    // 헬스체크 (/actuator/health)
+
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    compileOnly 'org.springframework:spring-webmvc'
+    compileOnly 'jakarta.servlet:jakarta.servlet-api'
+    compileOnly 'org.slf4j:slf4j-api'
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind'
+    // Security 는 소비 앱이 spring-boot-starter-security 를 넣었을 때만 켜진다
+    compileOnly 'org.springframework.boot:spring-boot-starter-security'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-web'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security'
+}

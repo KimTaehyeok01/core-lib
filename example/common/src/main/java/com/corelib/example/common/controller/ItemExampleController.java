@@ -1,4 +1,3 @@
-// common 예제 API (ApiResponse 응답, 예외는 전역 핸들러가 변환)
 package com.corelib.example.common.controller;
 
 import com.corelib.common.response.ApiResponse;

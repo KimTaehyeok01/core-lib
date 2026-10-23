@@ -1,4 +1,3 @@
-// 예제 테스트용 가짜 KCB OkCert 모듈 - 실제 jar 와 같은 클래스명·메서드 시그니처
 package kcb.module.v3;
 
 public class OkCert {

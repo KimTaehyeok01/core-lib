@@ -1,4 +1,3 @@
-// CommonAutoConfiguration 이 웹 앱에서만 전역 예외 핸들러를 등록하는지 검증
 package com.corelib.common;
 
 import static org.assertj.core.api.Assertions.assertThat;

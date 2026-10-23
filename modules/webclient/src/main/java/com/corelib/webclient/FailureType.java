@@ -1,4 +1,3 @@
-// 외부 API 호출 실패 분류 - 결과확정(후속조치 판단 가능)과 결과불명(상대 처리 여부 모름)
 package com.corelib.webclient;
 
 public enum FailureType {

@@ -1,4 +1,3 @@
-// 택배 접수·배송 조회 예제 API
 package com.corelib.example.webclient.controller;
 
 import com.corelib.common.response.ApiResponse;

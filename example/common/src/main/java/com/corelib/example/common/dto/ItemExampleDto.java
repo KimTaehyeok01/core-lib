@@ -1,4 +1,3 @@
-// common 예제(상품) 요청·응답 데이터
 package com.corelib.example.common.dto;
 
 import jakarta.validation.constraints.Max;

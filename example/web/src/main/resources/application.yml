@@ -1,0 +1,23 @@
+server:
+  port: 8113
+
+spring:
+  application:
+    name: example-web
+  output:
+    ansi:
+      enabled: always       # IntelliJ 콘솔에서도 색 표시 (CORE 로고 노란색)
+
+core:
+  web:
+    security:
+      # 헬스체크·Swagger·/error 는 기본 공개. 화면과 문의 접수만 더 연다 — 나머지(/api/admin/**)는 인증 필요
+      permit-paths: [/, /index.html, /api/inquiries/**]
+    request-log:
+      include-body: true    # 예제라 본문까지 — 비밀번호·이메일·휴대폰 값은 마스킹된다 (운영은 false 권장)
+
+example:
+  admin:
+    api-key: ${ADMIN_API_KEY:}    # 관리자 API 키 — 비우면 관리자 API 는 항상 401
+  inquiry:
+    limit-per-minute: 3           # 같은 IP 에서 1분에 접수할 수 있는 건수

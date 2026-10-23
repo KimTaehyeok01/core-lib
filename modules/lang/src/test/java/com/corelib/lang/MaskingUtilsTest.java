@@ -1,4 +1,3 @@
-// MaskingUtils 이름·휴대폰·이메일 마스킹 규칙 검증
 package com.corelib.lang;
 
 import static org.assertj.core.api.Assertions.assertThat;

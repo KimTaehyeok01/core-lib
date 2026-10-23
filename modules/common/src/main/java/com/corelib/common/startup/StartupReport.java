@@ -1,4 +1,3 @@
-// 기동 안내에 찍을 모듈 한 줄 (초기화 완료 / 미초기화 / 화면 주소)
 package com.corelib.common.startup;
 
 import java.time.Duration;

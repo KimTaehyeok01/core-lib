@@ -1,4 +1,3 @@
-// file 예제를 실제 앱으로 띄워 업로드→다운로드→삭제와 위험 확장자·임의 키 차단 검증
 package com.corelib.example.file;
 
 import static org.assertj.core.api.Assertions.assertThat;

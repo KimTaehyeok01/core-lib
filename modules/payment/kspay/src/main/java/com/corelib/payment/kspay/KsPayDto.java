@@ -1,4 +1,3 @@
-// KSPAY 승인/취소 요청·응답 데이터
 package com.corelib.payment.kspay;
 
 import com.corelib.lang.StringUtils;

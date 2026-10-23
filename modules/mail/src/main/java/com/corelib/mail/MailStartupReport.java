@@ -1,4 +1,3 @@
-// 기동 안내에 MailUtils 초기화 결과(SMTP 주소·발신자)를 알리는 자동설정 — 계정·비밀번호는 찍지 않는다
 package com.corelib.mail;
 
 import com.corelib.lang.MaskingUtils;

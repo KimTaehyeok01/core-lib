@@ -1,4 +1,3 @@
-// mail 모듈 사용 예제 앱 (http://localhost:8106)
 package com.corelib.example.mail;
 
 import org.springframework.boot.SpringApplication;

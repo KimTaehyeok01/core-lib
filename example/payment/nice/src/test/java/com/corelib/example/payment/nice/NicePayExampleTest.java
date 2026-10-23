@@ -1,4 +1,3 @@
-// 나이스페이 결제 예제를 실제 앱으로 띄워 주문 → returnUrl 검증·승인 → 취소 전 흐름 검증 (가짜 NICEPAY 서버)
 package com.corelib.example.payment.nice;
 
 import static org.assertj.core.api.Assertions.assertThat;

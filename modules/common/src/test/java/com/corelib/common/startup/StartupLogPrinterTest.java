@@ -1,4 +1,3 @@
-// 기동 안내 출력 내용(로고·주소·모듈 보고)과 core.startup-log.enabled 토글 검증
 package com.corelib.common.startup;
 
 import static org.assertj.core.api.Assertions.assertThat;

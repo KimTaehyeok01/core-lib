@@ -1,4 +1,3 @@
-// 개인정보 암호화 고객 예제 API
 package com.corelib.example.crypto.controller;
 
 import com.corelib.common.response.ApiResponse;

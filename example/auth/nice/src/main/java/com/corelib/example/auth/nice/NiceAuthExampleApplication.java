@@ -1,4 +1,3 @@
-// NICE 통합인증 예제 앱 (http://localhost:8108)
 package com.corelib.example.auth.nice;
 
 import org.springframework.boot.SpringApplication;

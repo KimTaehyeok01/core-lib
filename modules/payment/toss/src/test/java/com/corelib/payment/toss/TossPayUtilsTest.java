@@ -1,4 +1,3 @@
-// TossPayUtils 승인/취소/재조회 분기 검증 (로컬 HTTP 서버로 토스 응답 재현 — timeout·연결 거부 포함)
 package com.corelib.payment.toss;
 
 import static org.assertj.core.api.Assertions.assertThat;

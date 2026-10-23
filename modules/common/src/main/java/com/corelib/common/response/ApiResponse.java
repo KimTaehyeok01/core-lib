@@ -1,4 +1,3 @@
-// 컨트롤러 응답을 통일하는 공통 포맷 {success, data, code, message}
 package com.corelib.common.response;
 
 public class ApiResponse<T> {

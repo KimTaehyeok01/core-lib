@@ -1,4 +1,3 @@
-// auth.nice.client-id 가 있으면 timeout 이 걸린 WebClient 로 NiceAuthUtils 를 초기화하는 자동설정
 package com.corelib.auth.nice;
 
 import com.corelib.webclient.WebClientUtils;

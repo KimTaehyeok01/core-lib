@@ -1,4 +1,3 @@
-// 인증 요청~결과 확인 사이의 거래 상태를 서버 저장 없이 넘기기 위한 봉인/해제 (AES-256-GCM)
 package com.corelib.auth.nice;
 
 import com.corelib.common.error.CommonErrorCode;

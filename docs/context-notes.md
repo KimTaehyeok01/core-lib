@@ -79,3 +79,20 @@
 - Swagger 공통 에러: OperationCustomizer 로 codes(기본 400·404·500)는 전부, secured-codes(기본 401·403)는 @SecurityRequirement API 에만. 직접 적은 응답 코드는 유지. 본문 스키마 CoreErrorResponse 는 OpenApiCustomizer 로 넣어 소비 앱이 OpenAPI 빈을 직접 만들어도 붙는다.
 - Swagger UI 기본값(doc-expansion none, models depth -1)은 EnvironmentPostProcessor 로 맨 뒤 우선순위에 넣어 소비 앱 yml 이 이긴다.
 - IntelliJ 에서 .imports 파일이 초록 아이콘이 아닌 건 유료 Spring 플러그인 표시 차이 — 동작과 무관.
+
+## 7차 — base 보강 (2026-10-24, feat/base-web-module)
+- 사용자 회사 core 문서는 기능 목록으로만 참고 — 문서의 코드·문장·API 설계를 옮기지 않고 JDK·Spring 공식 동작 기준으로 새로 설계.
+- 사용자 요청으로 Java 파일 첫 줄 역할 주석 전부 제거, 새 파일에도 달지 않는다 (전역 CLAUDE.md 6번과 충돌 — 사용자에게 알림).
+- BouncyCastle bcprov-jdk18on 1.86 (2026-09-11 출시, minor cooldown 14일 통과, OSV 0건) — 1.85 미만은 2026 취약점(타이밍 채널·ASN.1 등) 있음. SEED·PKCS#1 용도, 경량 API(SEEDEngine)만 써서 JVM 전역 Provider 등록 안 함.
+- web 모듈 Security 는 소비 앱이 spring-boot-starter-security 를 넣었을 때만 동작(compileOnly + ConditionalOnClass) — 의존성만으로 보안이 강제되지 않게.
+- 클라이언트 IP 는 신뢰 프록시(기본 루프백·사설망)에서 온 요청일 때만 X-Forwarded-For 를 오른쪽부터 따라간다 — 헤더 위조 방지.
+- SEED 구현은 RFC 4269 테스트 벡터(키 0, 평문 00..0F → 5EBAC6E0...)로 검증.
+- 요청 로그 마스킹은 키 이름 끝 일치 — 부분 일치는 ci 가 price·city 를 가려 버림. 실기동에서 name 이 그대로 찍혀 name·address 를 기본 목록에 추가(goodsName 등도 가려지지만 개인정보 노출보다 안전한 쪽).
+- 컨트롤러 안의 AccessDeniedException 은 전역 핸들러(Exception)에 먼저 잡혀 500 이 되므로 web 에 최우선 SecurityExceptionHandler(403·401) 추가.
+- Boot 임시 비밀번호 로그를 막으려고 사용자 저장소가 없을 때만 빈 UserDetailsService 등록(ConditionalOnMissingBean).
+- 테스트 클래스 안의 static @RestController 는 Boot 테스트의 TypeExcludeFilter 로 스캔에서 빠진다 — @Bean 으로 등록.
+
+## 8차 — 배포 (2026-10-24)
+- 좌표에 계정명이 들어가지 않도록 GitHub Packages 로 결정 — 좌표 com.corelib:{artifactId}:0.1.0, 저장소 URL 에만 계정명(규칙상 불가피).
+- GitHub Packages Maven 은 공개 레포도 받을 때 토큰 필요(classic PAT read:packages), 올릴 때 write:packages. credentials 는 gpr.user/gpr.key 또는 GITHUB_ACTOR/GITHUB_TOKEN — 코드에 리터럴 없음.
+- 모듈별 README 13개 작성, 루트 README 의 모듈 사용법은 링크 표로 대체(두 곳 관리로 어긋나는 것 방지).

@@ -1,4 +1,3 @@
-// 각 API 문서에 공통 에러 응답(ApiResponse 형식 + 에러코드 예시)을 붙이는 springdoc 커스터마이저
 package com.corelib.swagger;
 
 import com.corelib.common.error.CommonErrorCode;

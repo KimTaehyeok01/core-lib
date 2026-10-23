@@ -1,4 +1,3 @@
-// NICE 인증 예제를 실제 앱으로 띄워 인증 → 회원 가입/로그인 → 결과 조회 전 흐름 검증 (가짜 NICE 서버)
 package com.corelib.example.auth.nice;
 
 import static org.assertj.core.api.Assertions.assertThat;

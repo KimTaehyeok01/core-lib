@@ -1,4 +1,3 @@
-// WebClientUtils 로 택배사 API 를 호출해 접수·배송 조회를 하는 예제 서비스 (배송은 메모리 보관)
 package com.corelib.example.webclient.service;
 
 import com.corelib.common.error.CommonErrorCode;

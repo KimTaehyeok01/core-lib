@@ -1,4 +1,3 @@
-// KSPAY 결제 예제를 실제 앱으로 띄워 주문 → 결제창 수신 → 승인 → 부분/전액 취소 전 흐름 검증 (가짜 KSPAY 서버, MS949 응답)
 package com.corelib.example.payment.kspay;
 
 import static org.assertj.core.api.Assertions.assertThat;

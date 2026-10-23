@@ -1,4 +1,3 @@
-// 토스페이먼츠 연동 설정 (payment.toss.*)
 package com.corelib.payment.toss;
 
 import com.corelib.common.error.CommonErrorCode;

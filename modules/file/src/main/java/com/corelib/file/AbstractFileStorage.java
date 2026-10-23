@@ -1,4 +1,3 @@
-// 저장소 공통 처리 - 업로드 검증(크기/확장자/디렉터리)과 저장 키 생성, 키 경로 조작 차단
 package com.corelib.file;
 
 import com.corelib.common.exception.CoreException;

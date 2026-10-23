@@ -1,4 +1,3 @@
-// MailUtils 메시지 구성·발송 실패·요청 검증 (SMTP 대신 발송을 가로채는 sender 사용)
 package com.corelib.mail;
 
 import static org.assertj.core.api.Assertions.assertThat;

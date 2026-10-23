@@ -1,4 +1,3 @@
-// KsPayUtils 승인(통합모듈 MS949 백틱 응답)·재전송·대조 검증과 webfep 취소 검증 (로컬 HTTP 서버)
 package com.corelib.payment.kspay;
 
 import static org.assertj.core.api.Assertions.assertThat;

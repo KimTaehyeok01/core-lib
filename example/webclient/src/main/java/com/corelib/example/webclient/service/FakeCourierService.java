@@ -1,4 +1,3 @@
-// 로컬 실행용 가짜 택배사 — 실제 택배사 API 를 흉내 내 bootRun 만으로 접수·조회 흐름이 돈다
 package com.corelib.example.webclient.service;
 
 import com.corelib.example.webclient.dto.ShipmentExampleDto;

@@ -1,4 +1,3 @@
-// swagger 예제(상품) 요청·응답 데이터 — @Schema 로 문서 설명을 단다
 package com.corelib.example.swagger.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;

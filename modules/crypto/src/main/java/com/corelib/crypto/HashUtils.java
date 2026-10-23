@@ -1,4 +1,3 @@
-// SHA-256 해시 유틸 (서명 검증·무결성 확인용)
 package com.corelib.crypto;
 
 import java.nio.charset.StandardCharsets;

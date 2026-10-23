@@ -1,4 +1,3 @@
-// 나이스페이먼츠 연동 전용 에러코드 (벤더 결과코드는 NICEPAY_{resultCode} 로 패스스루)
 package com.corelib.payment.nice;
 
 import com.corelib.common.error.ErrorCode;

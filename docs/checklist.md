@@ -24,3 +24,15 @@
 - [ ] KCB 결과 필드명을 계약 가이드로 확정
 - [ ] 실제 테스트키·계약으로 벤더 런타임 호출 검증
 - [ ] JitPack 릴리스(v0.1.0) 빌드 확인
+
+## base 보강 (feat/base-web-module)
+- [x] 브랜치 분기, Java 첫 줄 주석 제거(사용자 요청)
+- [x] lang — DateTimeUtils
+- [x] crypto — HexUtils · RsaUtils · PemUtils · SeedUtils (BouncyCastle 1.86)
+- [x] web — 클라이언트 IP · traceId/MDC · 비동기 MDC · 요청 로그
+- [x] web — Security 기본 체인(선택) · Actuator 헬스체크 기본값 · 기동 안내
+- [x] example/web (8113)
+- [x] 전체 빌드 · 실기동 · README
+- [x] 모듈별 README 13개 (의존성·설정·사용법·API·에러코드·주의·예제) — 루트 README 는 링크 표로
+- [x] 원격 배포 — GitHub Packages (좌표 com.corelib:{artifactId}:0.1.0, 토큰은 gradle.properties·환경변수)
+- [ ] 첫 업로드 (./gradlew publish) — 사용자 토큰 필요

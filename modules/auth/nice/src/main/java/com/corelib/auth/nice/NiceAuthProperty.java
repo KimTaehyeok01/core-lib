@@ -1,4 +1,3 @@
-// NICE 통합인증 설정 (auth.nice.*)
 package com.corelib.auth.nice;
 
 import com.corelib.common.error.CommonErrorCode;

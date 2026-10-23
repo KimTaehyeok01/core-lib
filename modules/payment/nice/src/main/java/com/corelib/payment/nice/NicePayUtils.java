@@ -1,4 +1,3 @@
-// 나이스페이먼츠 결제 인증검증/승인/망취소/취소/조회 진입점
 package com.corelib.payment.nice;
 
 import com.corelib.common.error.CommonErrorCode;

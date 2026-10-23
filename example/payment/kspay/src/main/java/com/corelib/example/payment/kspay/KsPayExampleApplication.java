@@ -1,4 +1,3 @@
-// KSPAY 결제 예제 앱 (http://localhost:8112)
 package com.corelib.example.payment.kspay;
 
 import org.springframework.boot.SpringApplication;

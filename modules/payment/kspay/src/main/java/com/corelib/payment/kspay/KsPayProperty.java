@@ -1,4 +1,3 @@
-// KSPAY 연동 설정 (payment.kspay.*)
 package com.corelib.payment.kspay;
 
 import com.corelib.common.error.CommonErrorCode;

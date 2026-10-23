@@ -1,4 +1,3 @@
-// 이메일 인증코드 예제 API
 package com.corelib.example.mail.controller;
 
 import com.corelib.common.response.ApiResponse;

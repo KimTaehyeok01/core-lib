@@ -1,4 +1,3 @@
-// KCB 본인확인 예제 요청·응답 데이터
 package com.corelib.example.auth.kcb.dto;
 
 import java.time.LocalDate;

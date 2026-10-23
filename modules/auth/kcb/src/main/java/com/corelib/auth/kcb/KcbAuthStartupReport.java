@@ -1,4 +1,3 @@
-// 기동 안내에 KcbAuthUtils 초기화 결과(대상 서버·OkCert jar 유무)를 알리는 자동설정 — 회원사코드·라이선스 경로는 찍지 않는다
 package com.corelib.auth.kcb;
 
 import com.corelib.common.startup.StartupReport;

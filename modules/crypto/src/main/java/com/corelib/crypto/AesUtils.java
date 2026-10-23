@@ -1,4 +1,3 @@
-// AES 암복호화 유틸 (GCM 권장, 레거시 연동용 CBC)
 package com.corelib.crypto;
 
 import com.corelib.common.exception.CoreException;

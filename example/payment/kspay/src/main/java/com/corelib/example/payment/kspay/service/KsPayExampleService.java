@@ -1,4 +1,3 @@
-// KsPayUtils 로 통합모듈 결제창 승인·webfep 취소를 처리하는 예제 서비스 (주문은 메모리 보관)
 package com.corelib.example.payment.kspay.service;
 
 import com.corelib.common.error.CommonErrorCode;

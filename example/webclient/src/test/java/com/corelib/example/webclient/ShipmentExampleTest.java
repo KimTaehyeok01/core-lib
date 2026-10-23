@@ -1,4 +1,3 @@
-// 택배 예제를 실제 앱으로 띄워 접수·조회와 실패 분류별 처리(거절·결과불명 복구·재시도) 검증 (가짜 택배사 서버)
 package com.corelib.example.webclient;
 
 import static org.assertj.core.api.Assertions.assertThat;

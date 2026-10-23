@@ -1,4 +1,3 @@
-// KCB 휴대폰 본인확인(팝업) 진입점 - 팝업 시작과 결과 확인 2단계
 package com.corelib.auth.kcb;
 
 import com.corelib.common.error.CommonErrorCode;

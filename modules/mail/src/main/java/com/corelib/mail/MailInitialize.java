@@ -1,4 +1,3 @@
-// JavaMailSender 빈이 있으면 MailUtils 를 초기화하는 자동설정
 package com.corelib.mail;
 
 import org.springframework.boot.autoconfigure.AutoConfiguration;

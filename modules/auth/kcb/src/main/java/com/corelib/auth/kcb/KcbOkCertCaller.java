@@ -1,4 +1,3 @@
-// KCB OkCert3 모듈(kcb.module.v3.OkCert) 리플렉션 호출 - jar 없이도 코어가 컴파일되게 한다
 package com.corelib.auth.kcb;
 
 import com.corelib.common.exception.CoreException;

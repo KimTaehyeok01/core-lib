@@ -1,4 +1,3 @@
-// 앱 기동이 끝나면 CORE 로고·실행 주소·모듈 초기화 결과를 콘솔에 한 번 찍는 리스너
 package com.corelib.common.startup;
 
 import com.corelib.lang.StringUtils;

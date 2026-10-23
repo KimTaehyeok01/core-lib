@@ -1,4 +1,3 @@
-// swagger 모듈 사용 예제 앱 (http://localhost:8105/swagger-ui.html)
 package com.corelib.example.swagger;
 
 import org.springframework.boot.SpringApplication;

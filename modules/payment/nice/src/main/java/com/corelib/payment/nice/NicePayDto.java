@@ -1,4 +1,3 @@
-// 나이스페이먼츠 인증결과/승인/취소/조회 요청·응답 데이터
 package com.corelib.payment.nice;
 
 import com.corelib.lang.StringUtils;

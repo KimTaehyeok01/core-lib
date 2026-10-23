@@ -1,4 +1,3 @@
-// MailUtils 로 이메일 인증코드를 보내고 확인하는 예제 서비스 (인증 대기는 메모리 보관)
 package com.corelib.example.mail.service;
 
 import com.corelib.common.error.ErrorCode;

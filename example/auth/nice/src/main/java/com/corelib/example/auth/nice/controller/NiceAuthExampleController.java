@@ -1,4 +1,3 @@
-// NICE 통합인증 예제 API + return_url 콜백
 package com.corelib.example.auth.nice.controller;
 
 import com.corelib.common.error.CommonErrorCode;

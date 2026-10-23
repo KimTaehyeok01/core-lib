@@ -1,4 +1,3 @@
-// Swagger UI 기본 화면 설정(API 접힘·Schemas 숨김)을 가장 낮은 우선순위로 넣는 EnvironmentPostProcessor
 package com.corelib.swagger;
 
 import java.util.Map;

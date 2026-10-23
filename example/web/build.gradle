@@ -1,0 +1,9 @@
+// example-web: web 모듈(클라이언트 IP·traceId·요청 로그·비동기 MDC·Security·헬스체크)로 만든 고객 문의 접수 예제 — http://localhost:8113
+
+dependencies {
+    implementation project(':modules:web')
+    implementation project(':modules:common')
+    implementation project(':modules:lang')
+    implementation 'org.springframework.boot:spring-boot-starter-security'      // core 기본 보안 체인이 켜진다
+    implementation 'org.springframework.boot:spring-boot-starter-validation'    // ValidateUtils 구현체
+}

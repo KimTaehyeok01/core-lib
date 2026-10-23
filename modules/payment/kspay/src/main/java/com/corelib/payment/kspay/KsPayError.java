@@ -1,4 +1,3 @@
-// KSPAY 연동 전용 에러코드 (벤더 결과코드는 KSPAY_{code} 로 패스스루)
 package com.corelib.payment.kspay;
 
 import com.corelib.common.error.ErrorCode;

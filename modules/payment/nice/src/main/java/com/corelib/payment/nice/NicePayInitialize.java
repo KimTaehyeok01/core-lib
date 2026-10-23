@@ -1,4 +1,3 @@
-// payment.nice.client-key 가 있으면 Basic 인증·timeout 이 걸린 WebClient 로 NicePayUtils 를 초기화하는 자동설정
 package com.corelib.payment.nice;
 
 import com.corelib.webclient.WebClientUtils;

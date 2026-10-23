@@ -1,4 +1,3 @@
-// common 예제를 실제 앱으로 띄워 응답 포맷·전역 예외 핸들러 자동등록 검증
 package com.corelib.example.common;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
