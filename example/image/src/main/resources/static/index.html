@@ -1,0 +1,56 @@
+<!doctype html>
+<!-- 프로필 사진 예제 화면: 업로드 → 규격 3종 미리보기 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>프로필 사진 예제</title>
+<style>
+	body { font-family: sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+	figure { display: inline-block; margin: 12px 12px 0 0; vertical-align: top; }
+	figcaption { font-size: 13px; color: #555; }
+	img { border: 1px solid #ddd; max-width: 100%; }
+	.error { color: #c00; }
+</style>
+</head>
+<body>
+<h1>프로필 사진</h1>
+<p>jpeg·png·gif·bmp·webp, 10MB 이하. 휴대폰 사진은 방향을 바로 세우고 위치정보(EXIF)를 지웁니다.</p>
+<form id="uploadForm">
+	<input id="file" type="file" accept="image/*" required>
+	<button type="submit">올리기</button>
+</form>
+<p id="message"></p>
+<div id="variants"></div>
+
+<script>
+	document.getElementById('uploadForm').addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const form = new FormData();
+		form.append('file', document.getElementById('file').files[0]);
+		const body = await (await fetch('/api/profile-images/upload', {method: 'POST', body: form})).json();
+		const message = document.getElementById('message');
+		const variants = document.getElementById('variants');
+		variants.replaceChildren();
+		if (!body.success) {
+			message.className = 'error';
+			message.textContent = '[' + body.code + '] ' + body.message;
+			return;
+		}
+		message.className = '';
+		message.textContent = '원본 ' + body.data.originalWidth + '×' + body.data.originalHeight + ' ' + body.data.originalFormat
+			+ ' (' + Math.round(body.data.originalBytes / 1024) + 'KB)';
+		body.data.variants.forEach((variant) => {
+			const figure = document.createElement('figure');
+			const image = document.createElement('img');
+			image.src = variant.url;
+			image.alt = variant.name;
+			const caption = document.createElement('figcaption');
+			caption.textContent = variant.name + ' ' + variant.width + '×' + variant.height + ' (' + Math.round(variant.bytes / 1024) + 'KB)';
+			figure.append(image, caption);
+			variants.append(figure);
+		});
+	});
+</script>
+</body>
+</html>

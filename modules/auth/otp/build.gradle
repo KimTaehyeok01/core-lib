@@ -1,0 +1,10 @@
+// auth-otp: Google Authenticator 호환 TOTP(RFC 6238) — 비밀키 생성·otpauth URI·코드 검증, 외부 라이브러리 없음
+
+dependencies {
+    api project(':modules:common')
+
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+
+    testImplementation 'org.assertj:assertj-core'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params'
+}

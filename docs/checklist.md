@@ -35,4 +35,13 @@
 - [x] 전체 빌드 · 실기동 · README
 - [x] 모듈별 README 13개 (의존성·설정·사용법·API·에러코드·주의·예제) — 루트 README 는 링크 표로
 - [x] 원격 배포 — GitHub Packages (좌표 com.corelib:{artifactId}:0.1.0, 토큰은 gradle.properties·환경변수)
-- [ ] 첫 업로드 (./gradlew publish) — 사용자 토큰 필요
+- [x] 첫 업로드 0.1.0 (./gradlew publish) — 빈 소비 프로젝트에서 GitHub Packages 로 받아 지는 것 확인
+
+## A묶음 (feat/jwt-otp-excel-image)
+- [x] lang RoundUtils · common PageResponse
+- [x] jwt — 발급·검증·JWKS, web Security Bearer 필터 연동
+- [x] auth/otp — TOTP(RFC 6238) 비밀키·otpauth URI·검증
+- [x] excel — 어노테이션 기반 xlsx·csv 쓰기/읽기, 수식 주입 방지
+- [x] image — 리사이즈·크롭·다중 규격·EXIF 회전·webp 읽기, 해상도 폭탄 차단
+- [x] 예제 jwt · auth/otp · excel · image
+- [ ] README · 전체 빌드 · 실기동

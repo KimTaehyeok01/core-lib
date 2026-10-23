@@ -1,0 +1,21 @@
+// jwt: JWS 토큰 발급·검증(RS256·HS256)·JWKS — web 모듈 Security 와 함께 쓰면 Bearer 인증 필터가 자동으로 붙는다
+
+dependencies {
+    api project(':modules:common')
+    api project(':modules:crypto')                       // PEM 키 읽기
+    api 'com.nimbusds:nimbus-jose-jwt:10.10'             // 2026-09-17, OSV 0건
+
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    compileOnly 'org.slf4j:slf4j-api'
+    // Bearer 필터 — 소비 앱에 web 모듈 + spring-boot-starter-security 가 있을 때만 켜진다
+    compileOnly project(':modules:web')
+    compileOnly 'org.springframework.boot:spring-boot-starter-security'
+    compileOnly 'jakarta.servlet:jakarta.servlet-api'
+    compileOnly 'org.springframework:spring-webmvc'
+    compileOnly 'com.fasterxml.jackson.core:jackson-databind'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-web'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security'
+    testImplementation project(':modules:web')
+}

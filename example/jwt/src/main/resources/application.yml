@@ -1,0 +1,25 @@
+server:
+  port: 8114
+
+spring:
+  application:
+    name: example-jwt
+  output:
+    ansi:
+      enabled: always       # IntelliJ 콘솔에서도 색 표시 (CORE 로고 노란색)
+
+core:
+  jwt:
+    private-key: ${JWT_PRIVATE_KEY:}     # RS256 개인키 PEM — 비우면 예제가 기동할 때 임시 키를 만든다 (재시작하면 기존 토큰 무효)
+    issuer: example-jwt
+    access-token-ttl: 30m
+    refresh-token-ttl: 14d
+  web:
+    security:
+      # 로그인 전에 부르는 API·공개키·화면만 연다 — 나머지(/api/members/**, /api/admin/**)는 Bearer 토큰 필요
+      permit-paths: [/, /index.html, /api/auth/**, /.well-known/jwks.json]
+
+example:
+  admin:
+    email: ${ADMIN_EMAIL:}           # 둘 다 넣으면 기동 시 관리자 계정을 만든다
+    password: ${ADMIN_PASSWORD:}

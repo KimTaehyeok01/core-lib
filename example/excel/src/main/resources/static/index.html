@@ -1,0 +1,95 @@
+<!doctype html>
+<!-- 회원 명단 엑셀 예제 화면: 목록(페이지) · 다운로드 · 양식 · 일괄 등록 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>회원 명단 엑셀 예제</title>
+<style>
+	body { font-family: sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+	table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+	td, th { border: 1px solid #ccc; padding: 4px 6px; text-align: left; }
+	a, button { margin-right: 8px; }
+	.error { color: #c00; }
+	.ok { color: #070; }
+</style>
+</head>
+<body>
+<h1>회원 명단</h1>
+<p>
+	<a href="/api/members/export?format=xlsx">엑셀 다운로드</a>
+	<a href="/api/members/export?format=csv">CSV 다운로드</a>
+	<a href="/api/members/template">등록 양식</a>
+</p>
+
+<table>
+	<thead><tr><th>번호</th><th>이름</th><th>이메일</th><th>등급</th><th>포인트</th><th>가입일</th></tr></thead>
+	<tbody id="rows"></tbody>
+</table>
+<p><button id="prev">이전</button><span id="pageInfo"></span> <button id="next">다음</button></p>
+
+<h2>일괄 등록</h2>
+<form id="importForm">
+	<input id="file" type="file" accept=".xlsx,.csv" required>
+	<button type="submit">올리기</button>
+</form>
+<p id="message"></p>
+<ul id="errors"></ul>
+
+<script>
+	let page = 0;
+
+	async function load() {
+		const body = await (await fetch('/api/members/list?size=5&page=' + page)).json();
+		const rows = document.getElementById('rows');
+		rows.replaceChildren();
+		body.data.content.forEach((member) => {
+			const row = document.createElement('tr');
+			[member.memberNo, member.maskedName, member.maskedEmail, member.grade, member.point, member.joinedDt].forEach((value) => {
+				const cell = document.createElement('td');
+				cell.textContent = value ?? '-';
+				row.append(cell);
+			});
+			rows.append(row);
+		});
+		document.getElementById('pageInfo').textContent = ' ' + (body.data.page + 1) + ' / ' + Math.max(body.data.totalPages, 1)
+			+ ' (총 ' + body.data.totalElements + '명) ';
+		document.getElementById('prev').disabled = body.data.first;
+		document.getElementById('next').disabled = body.data.last;
+	}
+
+	document.getElementById('prev').addEventListener('click', () => { page--; load(); });
+	document.getElementById('next').addEventListener('click', () => { page++; load(); });
+
+	document.getElementById('importForm').addEventListener('submit', async (event) => {
+		event.preventDefault();
+		const form = new FormData();
+		form.append('file', document.getElementById('file').files[0]);
+		const body = await (await fetch('/api/members/import', {method: 'POST', body: form})).json();
+		const message = document.getElementById('message');
+		const errors = document.getElementById('errors');
+		errors.replaceChildren();
+		if (!body.success) {
+			message.className = 'error';
+			message.textContent = '[' + body.code + '] ' + body.message;
+			return;
+		}
+		if (body.data.errors.length > 0) {
+			message.className = 'error';
+			message.textContent = body.data.totalRows + '행 중 오류 ' + body.data.errors.length + '건 — 하나도 등록하지 않았습니다. 고쳐서 다시 올려 주세요.';
+			body.data.errors.forEach((error) => {
+				const item = document.createElement('li');
+				item.textContent = error.rowNumber + '행 [' + error.column + '] ' + error.message;
+				errors.append(item);
+			});
+			return;
+		}
+		message.className = 'ok';
+		message.textContent = body.data.importedCount + '명 등록 (평균 포인트 ' + body.data.averagePoint + ')';
+		load();
+	});
+
+	load();
+</script>
+</body>
+</html>

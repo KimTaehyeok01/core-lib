@@ -1,0 +1,8 @@
+// example-excel: excel 모듈로 만든 회원 명단 예제 — 엑셀·CSV 다운로드·양식·일괄 등록(행별 오류)·목록 페이지 — http://localhost:8116
+
+dependencies {
+    implementation project(':modules:excel')
+    implementation project(':modules:common')
+    implementation project(':modules:lang')
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+}

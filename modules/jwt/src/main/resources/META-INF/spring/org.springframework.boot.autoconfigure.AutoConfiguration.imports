@@ -1,0 +1,3 @@
+com.corelib.jwt.JwtInitialize
+com.corelib.jwt.JwtSecurityInitialize
+com.corelib.jwt.JwtStartupReport

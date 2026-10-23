@@ -26,6 +26,10 @@ DateTimeUtils.parseDate("20261024");              // yyyy-MM-dd · yyyyMMdd · y
 DateTimeUtils.format(LocalDateTime.now());        // "2026-10-24 15:30:00"
 DateTimeUtils.age(birthDate);                     // 만 나이
 
+RoundUtils.percentOf(15000, 3.3);                 // 495 (수수료 3.3%, 버림)
+RoundUtils.truncateWon(12345, 10);                // 12340 (10원 단위 절사)
+RoundUtils.round(new BigDecimal("1234"), -1);      // 1230
+
 MaskingUtils.name("홍길동");                       // 홍*동
 MaskingUtils.mobile("01012345678");               // 010-****-5678
 MaskingUtils.email("user@example.com");           // us**@example.com
@@ -39,11 +43,13 @@ MaskingUtils.email("user@example.com");           // us**@example.com
 | `RandomStringUtils` | `randomNumeric` · `randomAlphabetic` · `randomAlphanumeric` |
 | `DateTimeUtils` | `now` · `today` · `format` · `parseDate` · `parseDateTime` · `startOfDay` · `endOfDay` · `firstDayOfMonth` · `lastDayOfMonth` · `daysBetween` · `age` · `isBetween` · `fromEpochMilli` · `toEpochMilli` · `toKst`<br>형식 상수 `DATE` · `DATE_COMPACT` · `DATE_TIME` · `DATE_TIME_COMPACT`, 시간대 `KST` |
 | `MaskingUtils` | `name` · `mobile` · `email` |
+| `RoundUtils` | `round` · `ceil` · `floor` (BigDecimal, scale 음수 = 10원·100원 단위) · `round(double)` · `percentOf` · `rate` · `truncateWon` |
 
 ## 주의
 - `RandomStringUtils` 는 `SecureRandom` 이라 인증번호·토큰에 써도 된다.
 - `DateTimeUtils` 는 엄격 해석이라 2월 30일·13월 같은 값은 `IllegalArgumentException`. 해석 실패 메시지에는 입력값을 30자까지만 넣는다.
 - `endOfDay` 는 23:59:59.999999999 — DB 기간 조회는 `>= startOfDay(오늘) AND < startOfDay(내일)` 이 안전하다.
+- 금액 계산은 double 이 아니라 `RoundUtils`(BigDecimal) — 0.1 + 0.2 오차가 없다. 할인·수수료는 보통 버림(`floor`·`percentOf`).
 - 마스킹은 화면·로그용이다. 원문이 필요한 곳(DB)은 `crypto` 로 암호화한다.
 
 ## 예제

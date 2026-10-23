@@ -1,0 +1,13 @@
+// excel: 어노테이션(@ExcelColumn) 기반 엑셀(xlsx)·CSV 쓰기/읽기 — 헤더 이름으로 매핑, 행별 오류 수집, CSV 수식 주입 방지
+
+dependencies {
+    api project(':modules:common')
+    implementation 'org.apache.poi:poi-ooxml:5.5.1'    // 2025-11-26, OSV 0건 (6.0.0 은 major cooldown 미달)
+
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+
+    testImplementation 'org.assertj:assertj-core'
+    testImplementation 'org.apache.poi:poi-ooxml:5.5.1'
+    testRuntimeOnly 'org.apache.logging.log4j:log4j-to-slf4j'    // POI 로그를 slf4j 로
+    testRuntimeOnly 'ch.qos.logback:logback-classic'
+}

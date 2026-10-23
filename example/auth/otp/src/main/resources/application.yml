@@ -1,0 +1,21 @@
+server:
+  port: 8115
+
+spring:
+  application:
+    name: example-auth-otp
+  output:
+    ansi:
+      enabled: always       # IntelliJ 콘솔에서도 색 표시 (CORE 로고 노란색)
+
+auth:
+  otp:
+    issuer: core-lib 예제     # OTP 앱에 보이는 서비스 이름
+    window: 1                 # ±30초 허용
+
+example:
+  otp:
+    # OTP 비밀키 암호화 키 — base64 32byte, 환경변수로만 (비우면 기동 시 임시 키 — 재시작하면 등록한 OTP 를 못 쓴다)
+    secret-key: ${OTP_SECRET_KEY:}
+    max-failures: 5           # 연속 실패 허용 횟수
+    lock-duration: 5m         # 잠금 시간

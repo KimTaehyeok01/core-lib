@@ -96,3 +96,14 @@
 - 좌표에 계정명이 들어가지 않도록 GitHub Packages 로 결정 — 좌표 com.corelib:{artifactId}:0.1.0, 저장소 URL 에만 계정명(규칙상 불가피).
 - GitHub Packages Maven 은 공개 레포도 받을 때 토큰 필요(classic PAT read:packages), 올릴 때 write:packages. credentials 는 gpr.user/gpr.key 또는 GITHUB_ACTOR/GITHUB_TOKEN — 코드에 리터럴 없음.
 - 모듈별 README 13개 작성, 루트 README 의 모듈 사용법은 링크 표로 대체(두 곳 관리로 어긋나는 것 방지).
+
+## 9차 — A묶음 (2026-10-24, feat/jwt-otp-excel-image)
+- 회사 docs 는 기능 목록으로만 참고 — 구현은 RFC·라이브러리 공식 문서 기준.
+- 의존성: nimbus-jose-jwt 10.10 (2026-09-17, OSV 0), poi-ooxml 5.5.1 (2025-11-26, OSV 0 — 6.0.0 은 2026-10-19 출시로 major cooldown 30일 미달), imageio-webp 3.15.3 (2026-10-06, OSV 0). POI 하위(commons-compress 1.28.0·commons-io 2.21.0·xmlbeans 5.3.0) OSV 0.
+- CSV 는 RFC 4180 수준이라 직접 구현 (opencsv 의존 안 함).
+- OTP 는 crypto HMAC 로 직접 구현 — RFC 6238 부록 B 벡터로 검증.
+- jwt: 검증 때 헤더 alg 를 설정과 비교 — alg:none·공개키를 HMAC 비밀값으로 쓰는 바꿔치기를 테스트로 확인. Bearer 필터는 빈으로 만들지 않는다(서블릿 필터 이중 등록 방지) — CoreSecurityCustomizer 안에서 생성. 토큰을 보냈는데 만료·위조면 바로 401(JWT-EXPIRED·INVALID·TYPE) — 클라이언트가 갱신 여부를 판단.
+- jwt 예제: 리프레시 회전 + 재사용 감지(이미 쓴 jti 가 오면 전체 폐기). core 는 무상태라 jti 저장은 예제 서비스 몫.
+- otp: RFC 6238 부록 B 9개 벡터(SHA1·256·512) 통과. 재사용 방지는 timeStep 을 호출측이 저장, 잠금도 호출측.
+- excel: ReadResult 에 rowNumbers 추가 — 업무 검증 오류를 엑셀 행 번호로 알리려고(예제에서 필요해서 모듈 보강). 날짜 해석 오류 메시지에 입력값을 넣지 않게 고정 문장.
+- image: EXIF 방향 5·7 변환식은 좌표 대입으로 검증, 6·3·8 은 테스트로. ImageIO.setUseCache(false)(임시 파일 안 남김), scanForPlugins(실행 jar 의 webp 플러그인 등록).

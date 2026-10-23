@@ -1,0 +1,9 @@
+// example-auth-otp: auth/otp 모듈로 만든 2단계 인증 예제 — 등록(QR)·활성화·로그인 검증·재사용 차단·실패 잠금 — http://localhost:8115
+
+dependencies {
+    implementation project(':modules:auth:otp')
+    implementation project(':modules:crypto')    // OTP 비밀키 암호화 저장
+    implementation project(':modules:common')
+    implementation project(':modules:lang')
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+}

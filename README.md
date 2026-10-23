@@ -31,12 +31,16 @@ core-lib/
     ├── crypto/      AES(GCM/CBC)·RSA·PEM·SEED·HMAC·SHA·Hex·Base64(url)·PBKDF2
     ├── webclient/   외부 API 호출 (WebClient + timeout + 결과확정/불명 분류)
     ├── web/         서블릿 웹 공통 — 클라이언트 IP·traceId·요청 로그·비동기 MDC·Security 기본 체인·헬스체크
+    ├── jwt/         JWT 발급·검증·JWKS, web Security Bearer 필터
+    ├── excel/       엑셀(xlsx)·CSV 쓰기/읽기
+    ├── image/       이미지 리사이즈·크롭·다중 규격·EXIF 보정
     ├── swagger/     Swagger/OpenAPI 자동 설정
     ├── mail/        메일 발송
     ├── file/        파일 업로드/다운로드 (로컬 / S3)
     ├── auth/        본인인증
     │   ├── nice/    NICE 통합인증
-    │   └── kcb/     KCB 휴대폰 본인확인 (OkCert3 팝업)
+    │   ├── kcb/     KCB 휴대폰 본인확인 (OkCert3 팝업)
+    │   └── otp/     2단계 인증 TOTP (Google Authenticator)
     └── payment/     결제
         ├── toss/    토스페이먼츠
         ├── nice/    나이스페이먼츠
@@ -72,6 +76,10 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 | `example/payment/nice` | 8111 | `AUTHNICE.requestPay` → returnUrl 검증·승인 → 취소 | `NICEPAY_CLIENT_KEY`, `NICEPAY_SECRET_KEY` |
 | `example/payment/kspay` | 8112 | 통합모듈 결제창 → rcv → 승인 → webfep 취소 | 기본 테스트 상점, 취소는 `KSPAY_API_KEY` |
 | `example/web` | 8113 | 고객 문의 접수 (IP 별 제한·추적번호·관리자 API) | 관리자 API 는 `ADMIN_API_KEY` |
+| `example/jwt` | 8114 | 로그인·리프레시 회전·로그아웃·관리자 API·JWKS | 선택 `JWT_PRIVATE_KEY` (없으면 임시 키) |
+| `example/auth/otp` | 8115 | 2단계 인증 등록(QR)·검증·재사용 차단·잠금 | 선택 `OTP_SECRET_KEY` |
+| `example/excel` | 8116 | 회원 명단 다운로드·양식·일괄 등록·목록 페이지 | - |
+| `example/image` | 8117 | 프로필 사진 3종 규격 | - |
 
 각 예제 폴더의 `README.md` 에 흐름과 "소비 프로젝트에 옮길 것"이 있다.
 
@@ -93,16 +101,20 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 
 | 모듈 | artifactId | 내용 | 계약 필요 |
 |------|-----------|------|-----------|
-| [lang](modules/lang) | `lang` | 문자열·컬렉션·난수·날짜(KST)·마스킹 | - |
-| [common](modules/common) | `common` | ApiResponse·CoreException·전역 예외 핸들러·검증·기동 안내 | - |
+| [lang](modules/lang) | `lang` | 문자열·컬렉션·난수·날짜(KST)·금액 반올림·마스킹 | - |
+| [common](modules/common) | `common` | ApiResponse·PageResponse·CoreException·전역 예외 핸들러·검증·기동 안내 | - |
 | [crypto](modules/crypto) | `crypto` | AES·RSA·PEM·SEED·HMAC·SHA·PBKDF2 | - |
 | [webclient](modules/webclient) | `webclient` | 외부 API 호출 + 실패 분류 + MockHttpServer | - |
 | [web](modules/web) | `web` | 클라이언트 IP·traceId·요청 로그·Security·헬스체크 | - |
+| [jwt](modules/jwt) | `jwt` | JWT 발급·검증·JWKS, Bearer 필터 | - |
+| [excel](modules/excel) | `excel` | 엑셀·CSV 쓰기/읽기, 수식 주입 방지 | - |
+| [image](modules/image) | `image` | 리사이즈·크롭·다중 규격·EXIF·webp 읽기 | - |
 | [swagger](modules/swagger) | `swagger` | OpenAPI 자동 설정·공통 에러 응답 | - |
 | [mail](modules/mail) | `mail` | SMTP 메일 발송 | - |
 | [file](modules/file) | `file` | 로컬·S3 파일 저장 | - |
 | [auth/nice](modules/auth/nice) | `auth-nice` | NICE 통합인증 본인확인 | NICE |
 | [auth/kcb](modules/auth/kcb) | `auth-kcb` | KCB 휴대폰 본인확인 | KCB (jar·라이선스) |
+| [auth/otp](modules/auth/otp) | `auth-otp` | 2단계 인증 TOTP | - |
 | [payment/toss](modules/payment/toss) | `payment-toss` | 토스페이먼츠 | 가입만 (테스트 키) |
 | [payment/nice](modules/payment/nice) | `payment-nice` | 나이스페이먼츠 | 가입만 (샌드박스) |
 | [payment/kspay](modules/payment/kspay) | `payment-kspay` | KSNET KSPAY | 테스트 상점 공개, 취소는 계약 |

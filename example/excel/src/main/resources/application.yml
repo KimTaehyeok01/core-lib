@@ -1,0 +1,17 @@
+server:
+  port: 8116
+
+spring:
+  application:
+    name: example-excel
+  output:
+    ansi:
+      enabled: always       # IntelliJ 콘솔에서도 색 표시 (CORE 로고 노란색)
+  servlet:
+    multipart:
+      max-file-size: 5MB    # 업로드 파일 크기 상한 — 행 수 상한(core.excel.max-rows)과 함께 대용량 업로드를 막는다
+      max-request-size: 5MB
+
+core:
+  excel:
+    max-rows: 1000          # 한 번에 등록할 수 있는 행 수

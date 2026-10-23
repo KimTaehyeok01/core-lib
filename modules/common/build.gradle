@@ -8,6 +8,7 @@ dependencies {
     compileOnly 'org.springframework:spring-web'
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
     compileOnly 'org.slf4j:slf4j-api'
+    compileOnly 'org.springframework.data:spring-data-commons'    // PageUtils — JPA·Mongo 앱이 이미 갖고 있다
     compileOnly 'jakarta.validation:jakarta.validation-api'    // ValidateUtils - 구현체는 소비 앱 starter-validation
 
     testImplementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -18,5 +19,6 @@ dependencies {
     testImplementation 'org.springframework:spring-webmvc'    // 핸들러 테스트의 NoResourceFoundException
     testImplementation 'jakarta.servlet:jakarta.servlet-api'
     testImplementation 'org.assertj:assertj-core'
+    testImplementation 'org.springframework.data:spring-data-commons'
     testRuntimeOnly 'ch.qos.logback:logback-classic'
 }

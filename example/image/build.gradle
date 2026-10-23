@@ -1,0 +1,7 @@
+// example-image: image 모듈로 만든 프로필 사진 예제 — 업로드 → 썸네일·중간·큰 사이즈 3종, 규격별 보기 — http://localhost:8117
+
+dependencies {
+    implementation project(':modules:image')
+    implementation project(':modules:common')
+    implementation project(':modules:lang')
+}

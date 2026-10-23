@@ -1,0 +1,17 @@
+server:
+  port: 8117
+
+spring:
+  application:
+    name: example-image
+  output:
+    ansi:
+      enabled: always       # IntelliJ 콘솔에서도 색 표시 (CORE 로고 노란색)
+  servlet:
+    multipart:
+      max-file-size: 10MB   # 파일 크기 상한 — 해상도 상한(core.image.max-pixels)과 함께 쓴다
+      max-request-size: 10MB
+
+core:
+  image:
+    max-pixels: 40000000    # 가로×세로 상한 (4천만 = 약 8000×5000) — 넘으면 디코딩 전에 거절

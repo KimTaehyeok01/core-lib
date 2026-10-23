@@ -1,0 +1,11 @@
+// example-jwt: jwt 모듈(+ web Security)로 만든 회원 로그인 예제 — 토큰 발급·리프레시 회전·로그아웃·관리자 API·JWKS — http://localhost:8114
+
+dependencies {
+    implementation project(':modules:jwt')
+    implementation project(':modules:web')
+    implementation project(':modules:crypto')
+    implementation project(':modules:common')
+    implementation project(':modules:lang')
+    implementation 'org.springframework.boot:spring-boot-starter-security'      // core 보안 체인 + Bearer 필터
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+}

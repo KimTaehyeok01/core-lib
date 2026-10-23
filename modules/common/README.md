@@ -35,6 +35,10 @@ ErrorCode SOLD_OUT = ErrorCode.of("ITEM_SOLD_OUT", "품절된 상품입니다.",
 
 // 요청 DTO 의 jakarta 어노테이션 검증 — 위반이면 C400
 ValidateUtils.validate(request);
+
+// 목록 응답 — {content, page, size, totalElements, totalPages, first, last}
+return ApiResponse.success(PageResponse.of(items, page, size, total));
+return ApiResponse.success(PageUtils.from(repository.findAll(PageUtils.pageable(page, size, Sort.by("id").descending()))).map(Dto::from));
 ```
 
 ## 자동으로 켜지는 것
@@ -50,6 +54,8 @@ ValidateUtils.validate(request);
 | `CoreException` | `(ErrorCode)` · `(ErrorCode, detail)` · `(ErrorCode, detail, cause)` · `addErrorLogData(key, value)` |
 | `ErrorCode` | `code()` · `message()` · `status()` · `ErrorCode.of(code, message, status)` |
 | `ValidateUtils` | `validate(target)` |
+| `PageResponse<T>` | `of(content, page, size, total)` · `slice(all, page, size)` · `map(mapper)` — page 는 0 부터 |
+| `PageUtils` | `from(Page)` · `pageable(page, size, sort)` (size 1~100 검증, C400) — spring-data-commons 가 있는 앱에서 |
 | `UrlUtils` | `isHttpsOrLoopback(url)` — 벤더 주소는 https, 로컬 테스트 서버만 http 허용 |
 | `StartupReporter` / `StartupReport` | 모듈이 기동 안내에 자기 상태를 알리는 확장 지점 — `ready` · `notReady` · `link` |
 

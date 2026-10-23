@@ -1,0 +1,10 @@
+// image: byte[] 입출력 이미지 변환 — 리사이즈·가운데 크롭·다중 규격·EXIF 회전 보정·webp 읽기, 해상도 폭탄 차단 (JDK ImageIO)
+
+dependencies {
+    api project(':modules:common')
+    runtimeOnly 'com.twelvemonkeys.imageio:imageio-webp:3.15.3'    // webp 읽기 플러그인 (2026-10-06, OSV 0건) — 쓰기는 안 된다
+
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+
+    testImplementation 'org.assertj:assertj-core'
+}
