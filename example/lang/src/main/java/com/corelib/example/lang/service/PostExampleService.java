@@ -1,6 +1,7 @@
 package com.corelib.example.lang.service;
 
 import com.corelib.common.error.CommonErrorCode;
+import com.corelib.common.error.ErrorCode;
 import com.corelib.common.exception.CoreException;
 import com.corelib.common.util.ValidateUtils;
 import com.corelib.example.lang.dto.PostExampleDto;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.stereotype.Service;
 
 /**
@@ -36,8 +38,14 @@ public class PostExampleService {
 	private static final int SUMMARY_LENGTH = 50;
 	private static final int MAX_TAGS = 5;
 	private static final int MAX_TAG_LENGTH = 20;
+	/** 글마다 삭제 PIN 을 이만큼 틀리면 잠근다 — 6자리 PIN 대입(최대 100만 번) 방지 */
+	private static final int MAX_DELETE_FAILURES = 5;
+	private static final ErrorCode DELETE_LOCKED = ErrorCode.of("POST_DELETE_LOCKED", "삭제 PIN 을 여러 번 틀려 삭제가 잠겼습니다. 관리자에게 문의하세요.", 423);
 
-	/** 실서비스는 게시글 테이블 — 예제라 메모리에 둔다 */
+	/**
+	 * 실서비스는 게시글 테이블 — 예제라 메모리에 둔다.
+	 * 실서비스는 DB 조건부 UPDATE(WHERE delete_fail_count < ?) 로 같은 원자성 확보
+	 */
 	private final Map<String, PostExampleDto.Post> posts = new ConcurrentHashMap<>();
 
 	public PostExampleDto.CreateResponse create(PostExampleDto.CreateRequest request) {
@@ -87,16 +95,35 @@ public class PostExampleService {
 										.build();
 	}
 
-	/** 삭제 — 등록 때 받은 PIN 이 맞아야 한다 (상수 시간 비교) */
+	/**
+	 * 삭제 — 등록 때 받은 PIN 이 맞아야 한다 (상수 시간 비교). 글마다 5회 틀리면 잠근다.
+	 * 잠금 확인·PIN 비교·실패 횟수 증가·삭제를 compute 한 번으로 처리한다 — 동시에 보낸 오답들이 같은 횟수를 읽고 덮어써 잠금을 비켜 가지 못하게.
+	 */
 	public void delete(PostExampleDto.DeleteRequest request) {
 		ValidateUtils.validate(request);
-		PostExampleDto.Post post = find(request.getShareCode());
-		boolean isMatched = MessageDigest.isEqual(post.getDeletePin().getBytes(StandardCharsets.UTF_8),
-			request.getDeletePin().trim().getBytes(StandardCharsets.UTF_8));
-		if (!isMatched) {
-			throw new CoreException(CommonErrorCode.FORBIDDEN, "삭제 PIN 이 일치하지 않습니다.");
+		String shareCode = request.getShareCode().trim();
+		byte[] inputPin = request.getDeletePin().trim().getBytes(StandardCharsets.UTF_8);
+		AtomicReference<DeleteResult> result = new AtomicReference<>(DeleteResult.NOT_FOUND);
+		posts.computeIfPresent(shareCode, (code, post) -> {
+			if (post.getDeleteFailCount() >= MAX_DELETE_FAILURES) {
+				// 잠긴 뒤에는 PIN 을 비교하지 않는다 — 맞는 PIN 인지 알려 주는 신호를 남기지 않게
+				result.set(DeleteResult.LOCKED);
+				return post;
+			}
+			if (MessageDigest.isEqual(post.getDeletePin().getBytes(StandardCharsets.UTF_8), inputPin)) {
+				result.set(DeleteResult.DELETED);
+				return null;
+			}
+			result.set(DeleteResult.MISMATCH);
+			return post.toBuilder().deleteFailCount(post.getDeleteFailCount() + 1).build();
+		});
+		switch (result.get()) {
+			case NOT_FOUND -> throw new CoreException(CommonErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다.");
+			case LOCKED -> throw new CoreException(DELETE_LOCKED).addErrorLogData("shareCode", shareCode);
+			case MISMATCH -> throw new CoreException(CommonErrorCode.FORBIDDEN, "삭제 PIN 이 일치하지 않습니다.");
+			case DELETED -> {
+			}
 		}
-		posts.remove(post.getShareCode());
 	}
 
 	/** 공백·빈값·중복 제거, 소문자 통일, 최대 5개 */
@@ -139,5 +166,10 @@ public class PostExampleService {
 			throw new CoreException(CommonErrorCode.NOT_FOUND, "게시글을 찾을 수 없습니다.");
 		}
 		return post;
+	}
+
+	/** compute 안에서 정한 삭제 결과 — 예외는 compute 밖에서 던진다 (안에서 던지면 실패 횟수 증가도 버려진다) */
+	private enum DeleteResult {
+		NOT_FOUND, LOCKED, MISMATCH, DELETED
 	}
 }

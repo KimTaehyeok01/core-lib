@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import kcb.module.v3.OkCert;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,11 +54,19 @@ class KcbAuthExampleTest {
 		});
 	}
 
+	/** 팝업 시작 — 스텁이 mdlTkn 을 발급하고, 서버는 그 토큰을 세션에 묶는다 */
+	private void start(MockHttpSession session, String mdlTkn) throws Exception {
+		OkCert.nextMdlTkn = mdlTkn;
+		mockMvc.perform(post("/api/kcb/start").session(session))
+			   .andExpect(jsonPath("$.data.formFields.mdl_tkn").value(mdlTkn));
+	}
+
 	@Test
 	@DisplayName("시작 → 콜백 → 가입, 같은 CI 로 다시 인증하면 같은 회원으로 로그인(번호 갱신), 결과는 마스킹")
 	void joinThenLogin() throws Exception {
 		MockHttpSession session = new MockHttpSession();
 
+		OkCert.nextMdlTkn = "tkn-1";
 		mockMvc.perform(post("/api/kcb/start").session(session))
 			   .andExpect(jsonPath("$.data.popupUrl").value("https://safe.ok-name.co.kr/CommonSvl"))
 			   .andExpect(jsonPath("$.data.formFields.mdl_tkn").value("tkn-1"))
@@ -71,7 +80,14 @@ class KcbAuthExampleTest {
 							 .andReturn().getResponse().getContentAsString();
 		Integer memberId = JsonPath.read(body, "$.data.memberId");
 
+		// 같은 콜백을 다시 열면 세션 토큰이 이미 소비돼 KCB 조회 없이 실패
+		OkCert.lastSvcName = null;
+		mockMvc.perform(get("/kcb/return").param("mdl_tkn", "tkn-1").session(session))
+			   .andExpect(header().string("Location", startsWith("/done.html?result=fail")));
+		assertThat(OkCert.lastSvcName).isNull();
+
 		MockHttpSession again = new MockHttpSession();
+		start(again, "tkn-again");
 		mockMvc.perform(get("/kcb/return").param("mdl_tkn", "tkn-again").session(again))
 			   .andExpect(redirectedUrl("/done.html?result=success"));
 		mockMvc.perform(get("/api/kcb/result").session(again))
@@ -87,6 +103,7 @@ class KcbAuthExampleTest {
 	@DisplayName("만 14세 미만 - 가입 차단")
 	void underAge() throws Exception {
 		MockHttpSession session = new MockHttpSession();
+		start(session, "tkn-child");
 		mockMvc.perform(get("/kcb/return").param("mdl_tkn", "tkn-child").session(session))
 			   .andExpect(header().string("Location", startsWith("/done.html?result=fail")));
 		mockMvc.perform(get("/api/kcb/result").session(session))
@@ -96,9 +113,45 @@ class KcbAuthExampleTest {
 	@Test
 	@DisplayName("잘못된 토큰 - KCB 거절을 실패 페이지로")
 	void invalidToken() throws Exception {
-		mockMvc.perform(get("/kcb/return").param("mdl_tkn", "bad").session(new MockHttpSession()))
+		MockHttpSession session = new MockHttpSession();
+		start(session, "bad");
+		mockMvc.perform(get("/kcb/return").param("mdl_tkn", "bad").session(session))
 			   .andExpect(status().isFound())
 			   .andExpect(header().string("Location", startsWith("/done.html?result=fail")));
+	}
+
+	@Test
+	@DisplayName("start 없이 온 콜백 - KCB 결과 조회 없이 실패 페이지, 결과 없음")
+	void callbackWithoutStart() throws Exception {
+		MockHttpSession session = new MockHttpSession();
+		OkCert.lastSvcName = null;
+
+		mockMvc.perform(get("/kcb/return").param("mdl_tkn", "tkn-1").session(session))
+			   .andExpect(header().string("Location", startsWith("/done.html?result=fail")));
+		assertThat(OkCert.lastSvcName).isNull();
+		mockMvc.perform(get("/api/kcb/result").session(session))
+			   .andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("다른 세션이 발급받은 토큰(로그인 CSRF) - KCB 결과 조회 없이 실패, 세션 토큰은 그때 소비")
+	void tokenFromOtherSession() throws Exception {
+		MockHttpSession attacker = new MockHttpSession();
+		MockHttpSession victim = new MockHttpSession();
+		start(attacker, "tkn-1");
+		start(victim, "tkn-again");
+
+		// 공격자가 자기 세션에서 받은 토큰으로 피해자 브라우저를 콜백시킨다
+		mockMvc.perform(get("/kcb/return").param("mdl_tkn", "tkn-1").session(victim))
+			   .andExpect(header().string("Location", startsWith("/done.html?result=fail")));
+		assertThat(OkCert.lastSvcName).isEqualTo("IDS_HS_POPUP_START");
+		mockMvc.perform(get("/api/kcb/result").session(victim))
+			   .andExpect(status().isNotFound());
+
+		// 불일치 때 이미 소비했으므로 피해자 세션의 원래 토큰도 다시 쓸 수 없다
+		mockMvc.perform(get("/kcb/return").param("mdl_tkn", "tkn-again").session(victim))
+			   .andExpect(header().string("Location", startsWith("/done.html?result=fail")));
+		assertThat(OkCert.lastSvcName).isEqualTo("IDS_HS_POPUP_START");
 	}
 
 	@Test

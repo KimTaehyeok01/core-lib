@@ -21,9 +21,11 @@ docker run -d -p 1025:1025 -p 8025:8025 axllent/mailpit
 | 보관 | 코드 해시만, 비교는 상수 시간 | `HashUtils.sha256Hex`, `HmacUtils.isEqual` |
 | 유효시간 / 재발송 대기 | 5분 / 60초 (`example.verification.*`) | |
 | 오입력 | 5번 틀리면 코드 폐기 | |
+| 동시 요청 | 쿨다운 검사·기록, 오입력 판정·집계·폐기를 각각 `compute` 한 번에 — 동시 발송은 1통만, 병렬 오답도 전부 집계 | |
+| 만료 코드 | 발송·확인 때 정리 | |
 | 화면·로그 | 이메일 마스킹 | `MaskingUtils.email` |
 
 ## 소비 프로젝트에 옮길 것
-- `service/EmailVerificationExampleService` — 인증 대기 저장소만 Redis(TTL)·테이블로 바꾸면 된다
+- `service/EmailVerificationExampleService` — 인증 대기 저장소만 Redis(TTL)·테이블로 바꾸면 된다. 횟수 증가·쿨다운은 DB 조건부 UPDATE·Redis 원자 연산으로 같은 원자성을 지킨다
 - 발송 실패면 대기 코드를 지워 바로 재요청할 수 있게
 - 대량·비동기 발송(재시도 큐)은 소비 프로젝트 책임

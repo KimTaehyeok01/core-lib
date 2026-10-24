@@ -1,14 +1,27 @@
 package com.corelib.example.auth.otp;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.corelib.auth.otp.OtpUtils;
+import com.corelib.common.exception.CoreException;
+import com.corelib.example.auth.otp.service.OtpExampleService;
 import com.jayway.jsonpath.JsonPath;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,6 +65,32 @@ class OtpExampleTest {
 		return "{\"memberId\":\"" + memberId + "\",\"code\":\"" + code + "\"}";
 	}
 
+	/** 같은 요청 count 건을 동시에 보내고 응답 상태 코드를 모은다 */
+	private List<Integer> postConcurrently(int count, String path, String json) throws Exception {
+		ExecutorService executor = Executors.newFixedThreadPool(count);
+		CountDownLatch ready = new CountDownLatch(count);
+		CountDownLatch start = new CountDownLatch(1);
+		try {
+			List<Future<Integer>> futures = new ArrayList<>();
+			for (int i = 0; i < count; i++) {
+				futures.add(executor.submit(() -> {
+					ready.countDown();
+					start.await();
+					return postJson(path, json).andReturn().getResponse().getStatus();
+				}));
+			}
+			ready.await(10, TimeUnit.SECONDS);
+			start.countDown();
+			List<Integer> statuses = new ArrayList<>();
+			for (Future<Integer> future : futures) {
+				statuses.add(future.get(10, TimeUnit.SECONDS));
+			}
+			return statuses;
+		} finally {
+			executor.shutdownNow();
+		}
+	}
+
 	@Test
 	@DisplayName("등록 → 활성화 → 로그인 검증, 같은 코드 재사용은 거부")
 	void setupActivateVerify() throws Exception {
@@ -76,6 +115,53 @@ class OtpExampleTest {
 		postJson("/api/otp/verify", codeJson("m-2", wrong)).andExpect(status().isLocked()).andExpect(jsonPath("$.code").value("OTP_LOCKED"));
 		postJson("/api/otp/verify", codeJson("m-2", appCode(secret, 30))).andExpect(status().isLocked());
 		mockMvc.perform(get("/api/otp/status").param("memberId", "m-2")).andExpect(jsonPath("$.data.lockedUntil").isNotEmpty());
+	}
+
+	@Test
+	@DisplayName("병렬 오답 10건 — 동시에 보내도 오답 2번 뒤 3번째에 잠기고 나머지는 잠금(423)")
+	void lockAfterParallelFailures() throws Exception {
+		String secret = setup("m-5");
+		postJson("/api/otp/activate", codeJson("m-5", appCode(secret, 0))).andExpect(status().isOk());
+		String wrong = appCode(secret, 0).equals("000000") ? "111111" : "000000";
+
+		List<Integer> statuses = postConcurrently(10, "/api/otp/verify", codeJson("m-5", wrong));
+
+		assertThat(statuses).filteredOn(code -> code == 401).hasSize(2);
+		assertThat(statuses).filteredOn(code -> code == 423).hasSize(8);
+		mockMvc.perform(get("/api/otp/status").param("memberId", "m-5")).andExpect(jsonPath("$.data.lockedUntil").isNotEmpty());
+	}
+
+	@Test
+	@DisplayName("같은 유효 코드를 동시에 보내면 1건만 통과 (재사용 차단)")
+	void sameCodeConcurrently() throws Exception {
+		String secret = setup("m-6");
+		postJson("/api/otp/activate", codeJson("m-6", appCode(secret, -30))).andExpect(status().isOk());
+
+		List<Integer> statuses = postConcurrently(8, "/api/otp/verify", codeJson("m-6", appCode(secret, 0)));
+
+		assertThat(statuses).filteredOn(code -> code == 200).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("이미 켜진 상태에서 다시 활성화 — 400, 거부된 코드는 소비되지 않는다")
+	void activateTwice() throws Exception {
+		String secret = setup("m-7");
+		postJson("/api/otp/activate", codeJson("m-7", appCode(secret, -30))).andExpect(status().isOk());
+
+		postJson("/api/otp/activate", codeJson("m-7", appCode(secret, 0)))
+			.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("OTP_ALREADY_ENABLED"));
+		postJson("/api/otp/verify", codeJson("m-7", appCode(secret, 0))).andExpect(status().isOk());
+	}
+
+	@Test
+	@DisplayName("암호화 키가 base64 32byte 가 아니면 기동 실패")
+	void secretKeyMustBe32Bytes() {
+		String key16 = Base64.getEncoder().encodeToString(new byte[16]);
+		String key32 = Base64.getEncoder().encodeToString(new byte[32]);
+
+		assertThatThrownBy(() -> new OtpExampleService(key16, 5, Duration.ofMinutes(5)))
+			.isInstanceOf(CoreException.class).hasMessageContaining("example.otp.secret-key").hasMessageContaining("32byte");
+		assertThatCode(() -> new OtpExampleService(key32, 5, Duration.ofMinutes(5))).doesNotThrowAnyException();
 	}
 
 	@Test

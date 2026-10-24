@@ -17,17 +17,23 @@ public class TossExampleDto {
 
 	/** 주문 상태 — 실서비스 주문 테이블의 상태 컬럼 */
 	public enum OrderStatus {
-		/** 주문 생성, 결제 전 */
+		/** 주문 생성, 결제 전 — 서명 없는 브라우저 입력(failUrl·금액 불일치)이나 토스 승인 거절로는 이 상태를 벗어나지 않는다 */
 		READY,
+		/** 승인 진행 중 — 한 요청만 READY 에서 선점해 토스 승인을 호출한다 */
+		PROCESSING,
 		/** 결제 완료 */
 		PAID,
 		/** 가상계좌 발급, 입금 대기 */
 		WAITING_FOR_DEPOSIT,
 		/** 부분 취소 */
 		PARTIAL_CANCELED,
+		/** 취소 진행 중 — 한 요청만 선점해 토스 취소를 호출한다 */
+		CANCELING,
 		/** 전액 취소 */
 		CANCELED,
-		/** 결제 실패 (사용자 취소·거절·위변조) */
+		/** 취소 결과불명 — 이미 환불됐을 수 있어 재취소 금지, 관리자 확인 필요 */
+		CANCEL_UNKNOWN,
+		/** 결제 실패 — 승인 후 주문번호·금액 불일치로 자동취소한 경우 */
 		FAILED,
 		/** 결과불명 — 관리자 확인 필요 */
 		UNKNOWN

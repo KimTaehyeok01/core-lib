@@ -124,10 +124,6 @@ class NiceAuthExampleTest {
 							 .andReturn().getResponse().getContentAsString();
 		Integer memberId = JsonPath.read(body, "$.data.memberId");
 
-		// 같은 콜백을 다시 열면 txNo 가 없어 실패 페이지로
-		mockMvc.perform(get("/nice-auth/return").param("web_transaction_id", "web-1").session(session))
-			   .andExpect(header().string("Location", startsWith("/done.html?result=fail")));
-
 		MockHttpSession again = new MockHttpSession();
 		assertThat(authenticate(again, person("CI-JOIN", "19900101", "01099998888"))).isEqualTo("/done.html?result=success");
 		mockMvc.perform(get("/api/nice-auth/result").session(again))
@@ -138,6 +134,20 @@ class NiceAuthExampleTest {
 		String members = mockMvc.perform(get("/api/nice-auth/members/list"))
 								.andReturn().getResponse().getContentAsString();
 		assertThat(members).contains("\"memberId\":" + memberId).doesNotContain("01099998888", "홍길동", "CI-JOIN");
+	}
+
+	@Test
+	@DisplayName("콜백 재진입 - txNo 가 없어 실패 페이지로, 이전 인증 결과도 함께 지운다")
+	void callbackReentry() throws Exception {
+		MockHttpSession session = new MockHttpSession();
+		assertThat(authenticate(session, person("CI-REENTRY", "19900101", "01033334444"))).isEqualTo("/done.html?result=success");
+		mockMvc.perform(get("/api/nice-auth/result").session(session))
+			   .andExpect(status().isOk());
+
+		mockMvc.perform(get("/nice-auth/return").param("web_transaction_id", "web-1").session(session))
+			   .andExpect(header().string("Location", startsWith("/done.html?result=fail")));
+		mockMvc.perform(get("/api/nice-auth/result").session(session))
+			   .andExpect(status().isNotFound());
 	}
 
 	@Test

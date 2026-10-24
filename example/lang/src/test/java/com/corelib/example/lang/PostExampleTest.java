@@ -1,5 +1,6 @@
 package com.corelib.example.lang;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -7,6 +8,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -30,6 +39,11 @@ class PostExampleTest {
 					  .andExpect(jsonPath("$.data.shareCode").value(matchesPattern("[A-Za-z0-9]{8}")))
 					  .andExpect(jsonPath("$.data.deletePin").value(matchesPattern("[0-9]{6}")))
 					  .andReturn().getResponse().getContentAsString();
+	}
+
+	private ResultActions requestDelete(String shareCode, String pin) throws Exception {
+		return mockMvc.perform(post("/api/posts/delete").contentType(MediaType.APPLICATION_JSON)
+														.content("{\"shareCode\":\"" + shareCode + "\",\"deletePin\":\"" + pin + "\"}"));
 	}
 
 	@Test
@@ -81,5 +95,45 @@ class PostExampleTest {
 			   .andExpect(jsonPath("$.success").value(true));
 		mockMvc.perform(get("/api/posts/detail").param("shareCode", shareCode))
 			   .andExpect(status().isNotFound());
+	}
+
+	@Test
+	@DisplayName("삭제 PIN 오답 10건 동시 - 5건만 PIN 비교(C403), 나머지는 잠금(423), 잠긴 뒤엔 맞는 PIN 도 거부")
+	void deleteLockedAfterFailures() throws Exception {
+		String body = create("{\"title\":\"잠길 글\",\"content\":\"내용\"}");
+		String shareCode = JsonPath.read(body, "$.data.shareCode");
+		String pin = JsonPath.read(body, "$.data.deletePin");
+		String wrongPin = pin.equals("000000") ? "111111" : "000000";
+
+		int count = 10;
+		ExecutorService executor = Executors.newFixedThreadPool(count);
+		CountDownLatch ready = new CountDownLatch(count);
+		CountDownLatch start = new CountDownLatch(1);
+		List<String> codes = new ArrayList<>();
+		try {
+			List<Future<String>> futures = new ArrayList<>();
+			for (int i = 0; i < count; i++) {
+				futures.add(executor.submit(() -> {
+					ready.countDown();
+					start.await();
+					return JsonPath.<String>read(requestDelete(shareCode, wrongPin).andReturn().getResponse().getContentAsString(), "$.code");
+				}));
+			}
+			ready.await(5, TimeUnit.SECONDS);
+			start.countDown();
+			for (Future<String> future : futures) {
+				codes.add(future.get(10, TimeUnit.SECONDS));
+			}
+		} finally {
+			executor.shutdownNow();
+		}
+
+		assertThat(codes).filteredOn("C403"::equals).hasSize(5);
+		assertThat(codes).filteredOn("POST_DELETE_LOCKED"::equals).hasSize(5);
+		requestDelete(shareCode, pin)
+			.andExpect(status().is(423))
+			.andExpect(jsonPath("$.code").value("POST_DELETE_LOCKED"));
+		mockMvc.perform(get("/api/posts/detail").param("shareCode", shareCode))
+			   .andExpect(status().isOk());
 	}
 }

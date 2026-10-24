@@ -7,6 +7,8 @@ import com.corelib.example.auth.kcb.dto.KcbAuthExampleDto;
 import com.corelib.example.auth.kcb.service.KcbAuthExampleService;
 import jakarta.servlet.http.HttpSession;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,12 +23,15 @@ import org.springframework.web.util.UriComponentsBuilder;
 /**
  * 흐름: [인증하기] → POST /api/kcb/start → 화면이 팝업에 form POST(popupUrl) → KCB 가 return_url(?mdl_tkn=) 호출
  * → 결과 확인·회원 가입/로그인 후 /done.html → 부모 창 알림 → GET /api/kcb/result.
+ * start 가 발급한 mdl_tkn 을 세션에 묶어 두고, 콜백의 mdl_tkn 이 같을 때만 결과를 조회한다
+ * (남이 발급받은 토큰으로 이 브라우저를 로그인시키는 login CSRF 차단).
  */
 @Slf4j
 @RestController
 @RequiredArgsConstructor
 public class KcbAuthExampleController {
 
+	private static final String MDL_TKN = "KCB_AUTH_MDL_TKN";
 	private static final String VERIFIED = "KCB_AUTH_VERIFIED";
 
 	private final KcbAuthExampleService kcbAuthExampleService;
@@ -34,15 +39,20 @@ public class KcbAuthExampleController {
 	@PostMapping("/api/kcb/start")
 	public ApiResponse<KcbAuthExampleDto.StartResponse> start(HttpSession session) {
 		session.removeAttribute(VERIFIED);
-		return ApiResponse.success(kcbAuthExampleService.start());
+		KcbAuthExampleDto.StartResponse response = kcbAuthExampleService.start();
+		session.setAttribute(MDL_TKN, response.getFormFields().get("mdl_tkn"));
+		return ApiResponse.success(response);
 	}
 
 	/** auth.kcb.return-url 이 가리키는 콜백 — 팝업 안에서 열린다 */
 	@GetMapping("/kcb/return")
 	public ResponseEntity<Void> callback(@RequestParam(name = "mdl_tkn", required = false) String mdlTkn, HttpSession session) {
+		String issuedMdlTkn = (String) session.getAttribute(MDL_TKN);
+		session.removeAttribute(MDL_TKN);    // 맞든 틀리든 1회만 쓴다
 		try {
-			if (mdlTkn == null) {
-				throw new CoreException(CommonErrorCode.BAD_REQUEST, "인증 토큰이 없습니다. 다시 시도해 주세요.");
+			if (issuedMdlTkn == null || mdlTkn == null
+				|| !MessageDigest.isEqual(issuedMdlTkn.getBytes(StandardCharsets.UTF_8), mdlTkn.getBytes(StandardCharsets.UTF_8))) {
+				throw new CoreException(CommonErrorCode.BAD_REQUEST, "인증 요청 정보가 없습니다. 다시 시도해 주세요.");
 			}
 			session.setAttribute(VERIFIED, kcbAuthExampleService.confirm(mdlTkn));
 			return redirect("/done.html?result=success");

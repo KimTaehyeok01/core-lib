@@ -5,12 +5,15 @@ public class OkCert {
 	public static volatile String lastSvcName;
 	public static volatile String lastRequest;
 
+	/** 다음 팝업 시작에서 발급할 모듈 토큰 */
+	public static volatile String nextMdlTkn = "tkn-1";
+
 	/** 서비스명별로 정해진 응답을 돌려준다 */
 	public String callOkCert(String target, String cpCd, String svcName, String license, String request) {
 		lastSvcName = svcName;
 		lastRequest = request;
 		if ("IDS_HS_POPUP_START".equals(svcName)) {
-			return "{\"RSLT_CD\":\"B000\",\"RSLT_MSG\":\"정상\",\"MDL_TKN\":\"tkn-1\"}";
+			return "{\"RSLT_CD\":\"B000\",\"RSLT_MSG\":\"정상\",\"MDL_TKN\":\"" + nextMdlTkn + "\"}";
 		}
 		if (request.contains("\"tkn-1\"")) {
 			return person("CI-1", "19900101", "01012345678");

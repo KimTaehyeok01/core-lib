@@ -21,17 +21,23 @@ public class KsPayExampleDto {
 	public enum OrderStatus {
 		/** 주문 생성, 결제 전 */
 		READY,
+		/** 승인 요청 중 — READY 에서 한 요청만 선점한다 */
+		PROCESSING,
 		/** 결제 완료 */
 		PAID,
 		/** 가상계좌 발급, 입금 대기 */
 		WAITING_FOR_DEPOSIT,
 		/** 부분 취소 */
 		PARTIAL_CANCELED,
+		/** 취소 요청 중 — 한 요청만 선점한다 */
+		CANCELING,
 		/** 전액 취소 (가상계좌는 미입금 회수) */
 		CANCELED,
+		/** 취소 결과불명 — 재취소 금지(이중취소 위험), KSTA 관리자 확인 필요 */
+		CANCEL_UNKNOWN,
 		/** 결제 실패 (거절·결제키 무효·불일치 자동취소) */
 		FAILED,
-		/** 결과불명 — KSTA 관리자 확인 필요 */
+		/** 결과불명·불일치·미지원 결제수단 — KSTA 관리자 확인 필요 */
 		UNKNOWN
 	}
 

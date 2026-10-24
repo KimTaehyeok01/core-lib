@@ -9,9 +9,17 @@ import com.corelib.common.startup.StartupReport;
 import com.corelib.common.startup.StartupReporter;
 import jakarta.mail.Message;
 import jakarta.mail.MessagingException;
+import com.jayway.jsonpath.JsonPath;
 import jakarta.mail.internet.MimeMessage;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +33,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -81,6 +90,38 @@ class EmailVerificationExampleTest {
 		return mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(json));
 	}
 
+	/** 성공이면 "OK", 실패면 에러 코드 */
+	private static String resultOf(ResultActions actions) throws Exception {
+		MockHttpServletResponse response = actions.andReturn().getResponse();
+		return response.getStatus() == 200 ? "OK" : JsonPath.read(response.getContentAsString(), "$.code");
+	}
+
+	/** 같은 요청을 threads 개 스레드에서 한꺼번에 보낸다 — 모두 준비된 뒤 동시에 출발 */
+	private static List<String> concurrently(int threads, Callable<String> request) throws Exception {
+		ExecutorService executor = Executors.newFixedThreadPool(threads);
+		CountDownLatch ready = new CountDownLatch(threads);
+		CountDownLatch start = new CountDownLatch(1);
+		try {
+			List<Future<String>> futures = new ArrayList<>();
+			for (int i = 0; i < threads; i++) {
+				futures.add(executor.submit(() -> {
+					ready.countDown();
+					start.await();
+					return request.call();
+				}));
+			}
+			ready.await();
+			start.countDown();
+			List<String> results = new ArrayList<>();
+			for (Future<String> future : futures) {
+				results.add(future.get(30, TimeUnit.SECONDS));
+			}
+			return results;
+		} finally {
+			executor.shutdownNow();
+		}
+	}
+
 	/** 마지막으로 보낸 메일 본문에서 인증코드를 꺼낸다 */
 	private String lastCode() throws Exception {
 		MimeMessage message = sender().sent.get(sender().sent.size() - 1);
@@ -133,6 +174,36 @@ class EmailVerificationExampleTest {
 			.andExpect(jsonPath("$.code").value("VERIFY_TOO_MANY_FAILS"));
 		postJson("/api/email-verifications/confirm", "{\"email\":\"brute@example.com\",\"code\":\"" + code + "\"}")
 			.andExpect(jsonPath("$.code").value("VERIFY_NOT_REQUESTED"));
+	}
+
+	@Test
+	@DisplayName("오답 10건 동시 입력 - 전부 집계돼 4번 MISMATCH, 5번째에 폐기, 나머지는 NOT_REQUESTED / 이후 맞는 코드도 거부")
+	void parallelWrongCodes() throws Exception {
+		postJson("/api/email-verifications/send", "{\"email\":\"race-fail@example.com\"}").andExpect(status().isOk());
+		String code = lastCode();
+		String wrong = code.equals("000000") ? "111111" : "000000";
+
+		List<String> results = concurrently(10, () -> resultOf(
+			postJson("/api/email-verifications/confirm", "{\"email\":\"race-fail@example.com\",\"code\":\"" + wrong + "\"}")));
+
+		assertThat(results).filteredOn("VERIFY_MISMATCH"::equals).hasSize(4);
+		assertThat(results).filteredOn("VERIFY_TOO_MANY_FAILS"::equals).hasSize(1);
+		assertThat(results).filteredOn("VERIFY_NOT_REQUESTED"::equals).hasSize(5);
+		postJson("/api/email-verifications/confirm", "{\"email\":\"race-fail@example.com\",\"code\":\"" + code + "\"}")
+			.andExpect(jsonPath("$.code").value("VERIFY_NOT_REQUESTED"));
+	}
+
+	@Test
+	@DisplayName("같은 이메일로 동시 발송 10건 - 1건만 발송, 나머지는 429 (5회 반복)")
+	void parallelSend() throws Exception {
+		for (int round = 1; round <= 5; round++) {
+			String json = "{\"email\":\"burst" + round + "@example.com\"}";
+			List<String> results = concurrently(10, () -> resultOf(postJson("/api/email-verifications/send", json)));
+
+			assertThat(results).filteredOn("OK"::equals).hasSize(1);
+			assertThat(results).filteredOn("VERIFY_RESEND_TOO_SOON"::equals).hasSize(9);
+			assertThat(sender().sent).hasSize(round);
+		}
 	}
 
 	@Test

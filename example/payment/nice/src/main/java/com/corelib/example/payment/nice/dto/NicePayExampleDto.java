@@ -17,20 +17,26 @@ public class NicePayExampleDto {
 
 	/** 주문 상태 — 실서비스 주문 테이블의 상태 컬럼 */
 	public enum OrderStatus {
-		/** 주문 생성, 결제 전 */
+		/** 주문 생성, 결제 전 — 인증 실패·위변조 콜백이 와도 이 상태로 남아 다시 결제할 수 있다 */
 		READY,
+		/** 승인 진행 중 — 콜백 하나가 선점했다. 다른 콜백은 승인·망취소를 호출하지 않는다 */
+		PROCESSING,
 		/** 결제 완료 */
 		PAID,
 		/** 가상계좌 발급, 입금 대기 */
 		WAITING_FOR_DEPOSIT,
+		/** 취소 진행 중 — 취소 요청 하나가 선점했다 */
+		CANCELING,
 		/** 부분 취소 */
 		PARTIAL_CANCELED,
 		/** 전액 취소 */
 		CANCELED,
-		/** 결제 실패 (사용자 취소·거절·위변조·망취소 완료) */
+		/** 결제 실패 (승인 거절·망취소 완료·불일치 자동취소) */
 		FAILED,
-		/** 결과불명 — 관리자 확인 필요 */
-		UNKNOWN
+		/** 승인 결과불명 — 관리자 확인 필요 */
+		UNKNOWN,
+		/** 취소 결과불명 — 관리자 확인 필요, 이중 환불 위험이라 재취소를 막는다 */
+		CANCEL_UNKNOWN
 	}
 
 	// === 주문 생성 요청 ===
@@ -89,6 +95,9 @@ public class NicePayExampleDto {
 
 		/** 취소 가능 잔액 */
 		private final Integer balanceAmt;
+
+		/** 취소 요청 회차 — 회차마다 취소 orderId 를 {orderId}-c{회차} 로 새로 만든다 (같은 orderId 재호출 불가) */
+		private final int cancelCount;
 
 		/** 실패·결과불명 사유 */
 		private final String failMessage;

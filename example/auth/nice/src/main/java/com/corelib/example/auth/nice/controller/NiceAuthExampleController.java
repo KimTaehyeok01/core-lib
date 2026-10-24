@@ -47,6 +47,7 @@ public class NiceAuthExampleController {
 										 HttpSession session) {
 		String txNo = (String) session.getAttribute(TX_NO);
 		session.removeAttribute(TX_NO);    // txNo 는 1회만 쓴다
+		session.removeAttribute(VERIFIED);    // 재진입·실패면 이전 인증 결과가 남지 않게
 		try {
 			if (txNo == null || webTransactionId == null) {
 				throw new CoreException(CommonErrorCode.BAD_REQUEST, "인증 요청 정보가 없습니다. 다시 시도해 주세요.");

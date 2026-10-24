@@ -8,8 +8,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.corelib.common.startup.StartupReport;
 import com.corelib.common.startup.StartupReporter;
+import com.corelib.example.web.service.InquiryExampleService;
+import com.jayway.jsonpath.JsonPath;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +32,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestConstructor;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -34,6 +47,7 @@ class InquiryExampleTest {
 
 	private final MockMvc mockMvc;
 	private final List<StartupReporter> startupReporters;
+	private final InquiryExampleService inquiryExampleService;
 
 	private ResultActions create(String clientIp, String traceId) throws Exception {
 		return mockMvc.perform(post("/api/inquiries/create").contentType(MediaType.APPLICATION_JSON).content(BODY)
@@ -95,6 +109,64 @@ class InquiryExampleTest {
 														   .contentType(MediaType.APPLICATION_JSON)
 														   .content("{\"inquiryNo\":" + inquiryNo + ",\"answer\":\"환불 처리했습니다.\"}"))
 			   .andExpect(jsonPath("$.success").value(true));
+	}
+
+	@Test
+	@DisplayName("같은 문의에 답변 10건 동시 - 1건만 저장, 나머지는 409 INQUIRY_ALREADY_ANSWERED")
+	void concurrentAnswer() throws Exception {
+		String created = create("203.0.113.30", "answer-trace-0001").andReturn().getResponse().getContentAsString();
+		Integer inquiryNo = JsonPath.read(created, "$.data.inquiryNo");
+
+		int count = 10;
+		ExecutorService executor = Executors.newFixedThreadPool(count);
+		CountDownLatch ready = new CountDownLatch(count);
+		CountDownLatch start = new CountDownLatch(1);
+		List<Integer> statuses = new ArrayList<>();
+		try {
+			List<Future<Integer>> futures = new ArrayList<>();
+			for (int i = 0; i < count; i++) {
+				String answer = "답변 " + i;
+				futures.add(executor.submit(() -> {
+					ready.countDown();
+					start.await();
+					return mockMvc.perform(post("/api/admin/inquiries/answer").header("X-Admin-Key", "admin-test-key")
+																			   .contentType(MediaType.APPLICATION_JSON)
+																			   .content("{\"inquiryNo\":" + inquiryNo + ",\"answer\":\"" + answer + "\"}"))
+								  .andReturn().getResponse().getStatus();
+				}));
+			}
+			ready.await(5, TimeUnit.SECONDS);
+			start.countDown();
+			for (Future<Integer> future : futures) {
+				statuses.add(future.get(10, TimeUnit.SECONDS));
+			}
+		} finally {
+			executor.shutdownNow();
+		}
+
+		assertThat(statuses).filteredOn(status -> status == 200).hasSize(1);
+		assertThat(statuses).filteredOn(status -> status == 409).hasSize(count - 1);
+		mockMvc.perform(post("/api/admin/inquiries/answer").header("X-Admin-Key", "admin-test-key")
+														   .contentType(MediaType.APPLICATION_JSON)
+														   .content("{\"inquiryNo\":" + inquiryNo + ",\"answer\":\"또 답변\"}"))
+			   .andExpect(status().isConflict())
+			   .andExpect(jsonPath("$.code").value("INQUIRY_ALREADY_ANSWERED"));
+	}
+
+	@Test
+	@DisplayName("IP 접수 기록 정리 - 1분 지난 IP 키는 지우고, 최근 접수가 있는 IP 기록은 그대로 둬 제한 유지")
+	@SuppressWarnings("unchecked")
+	void evictIdleIps() throws Exception {
+		Map<String, Deque<LocalDateTime>> recentByIp = (Map<String, Deque<LocalDateTime>>) ReflectionTestUtils.getField(inquiryExampleService, "recentByIp");
+		recentByIp.put("192.0.2.99", new ArrayDeque<>(List.of(LocalDateTime.now().minusMinutes(2))));
+		for (int i = 0; i < 3; i++) {
+			create("192.0.2.100", "evict-trace-000" + i).andExpect(status().isOk());
+		}
+
+		inquiryExampleService.evictIdleIps();
+
+		assertThat(recentByIp).doesNotContainKey("192.0.2.99").containsKey("192.0.2.100");
+		create("192.0.2.100", "evict-trace-0009").andExpect(status().isTooManyRequests());
 	}
 
 	@Test

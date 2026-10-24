@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -40,7 +41,10 @@ public class EmailVerificationExampleService {
 	private static final ErrorCode MISMATCH = ErrorCode.of("VERIFY_MISMATCH", "인증코드가 일치하지 않습니다.", 400);
 	private static final ErrorCode TOO_MANY_FAILS = ErrorCode.of("VERIFY_TOO_MANY_FAILS", "인증코드를 여러 번 틀렸습니다. 다시 요청해 주세요.", 400);
 
-	/** 실서비스는 Redis(TTL) 나 인증 테이블 — 예제라 메모리에 둔다. 키는 소문자 이메일 */
+	/**
+	 * 실서비스는 Redis(TTL) 나 인증 테이블 — 예제라 메모리에 둔다. 키는 소문자 이메일.
+	 * 쿨다운 검사·실패 카운트는 compute 한 번으로 원자 처리 — 실서비스는 DB 조건부 UPDATE(WHERE fail_count = ?) 로 같은 원자성 확보
+	 */
 	private final Map<String, EmailVerificationExampleDto.Pending> pendings = new ConcurrentHashMap<>();
 	private final Duration codeTtl;
 	private final Duration resendCooldown;
@@ -57,11 +61,6 @@ public class EmailVerificationExampleService {
 		String key = email.toLowerCase(Locale.ROOT);
 		LocalDateTime now = LocalDateTime.now();
 
-		EmailVerificationExampleDto.Pending previous = pendings.get(key);
-		if (previous != null && now.isBefore(previous.getSentAt().plus(resendCooldown))) {
-			throw new CoreException(RESEND_TOO_SOON);
-		}
-
 		String code = RandomStringUtils.randomNumeric(CODE_LENGTH);
 		EmailVerificationExampleDto.Pending pending = EmailVerificationExampleDto.Pending.builder()
 																						 .codeHash(HashUtils.sha256Hex(code))
@@ -69,7 +68,14 @@ public class EmailVerificationExampleService {
 																						 .expiresAt(now.plus(codeTtl))
 																						 .failCount(0)
 																						 .build();
-		pendings.put(key, pending);
+		// 쿨다운 검사와 기록을 한 번에 — 동시에 여러 번 눌러도 1통만 나간다 (함수가 예외를 던지면 기존 값 유지)
+		pendings.compute(key, (k, previous) -> {
+			if (previous != null && now.isBefore(previous.getSentAt().plus(resendCooldown))) {
+				throw new CoreException(RESEND_TOO_SOON);
+			}
+			return pending;
+		});
+		removeExpired(now);
 		try {
 			MailUtils.sendHtml(email, SUBJECT, body(code));
 		} catch (CoreException e) {
@@ -84,38 +90,50 @@ public class EmailVerificationExampleService {
 													   .build();
 	}
 
-	/** 맞으면 코드를 폐기한다(1회용). 틀리면 횟수를 올리고 5번째에 폐기 */
+	/**
+	 * 맞으면 코드를 폐기한다(1회용). 틀리면 횟수를 올리고 5번째에 폐기.
+	 * 판정·횟수 증가·폐기를 compute 한 번에 처리한다 — 동시에 오답을 보내도 전부 집계되고, 맞는 코드를 동시에 보내도 1건만 성공
+	 */
 	public EmailVerificationExampleDto.ConfirmResponse confirm(EmailVerificationExampleDto.ConfirmRequest request) {
 		ValidateUtils.validate(request);
 		String key = request.getEmail().trim().toLowerCase(Locale.ROOT);
-		EmailVerificationExampleDto.Pending pending = pendings.get(key);
+		String codeHash = HashUtils.sha256Hex(request.getCode());
 		LocalDateTime now = LocalDateTime.now();
 
-		if (pending == null) {
-			throw new CoreException(NOT_REQUESTED);
-		}
-		if (now.isAfter(pending.getExpiresAt())) {
-			pendings.remove(key, pending);
-			throw new CoreException(EXPIRED);
-		}
-		if (!HmacUtils.isEqual(pending.getCodeHash(), HashUtils.sha256Hex(request.getCode()))) {
+		AtomicReference<CoreException> rejected = new AtomicReference<>();
+		pendings.compute(key, (k, pending) -> {
+			if (pending == null) {
+				rejected.set(new CoreException(NOT_REQUESTED));
+				return null;
+			}
+			if (now.isAfter(pending.getExpiresAt())) {
+				rejected.set(new CoreException(EXPIRED));
+				return null;
+			}
+			if (HmacUtils.isEqual(pending.getCodeHash(), codeHash)) {
+				return null;
+			}
 			int failCount = pending.getFailCount() + 1;
 			if (failCount >= MAX_FAIL_COUNT) {
-				pendings.remove(key, pending);
-				throw new CoreException(TOO_MANY_FAILS);
+				rejected.set(new CoreException(TOO_MANY_FAILS));
+				return null;
 			}
-			pendings.replace(key, pending, pending.toBuilder().failCount(failCount).build());
-			throw new CoreException(MISMATCH, MISMATCH.message() + " (" + failCount + "/" + MAX_FAIL_COUNT + ")");
-		}
-
-		// 동시에 두 번 확인해도 한 번만 성공한다
-		if (!pendings.remove(key, pending)) {
-			throw new CoreException(NOT_REQUESTED);
+			rejected.set(new CoreException(MISMATCH, MISMATCH.message() + " (" + failCount + "/" + MAX_FAIL_COUNT + ")"));
+			return pending.toBuilder().failCount(failCount).build();
+		});
+		removeExpired(now);
+		if (rejected.get() != null) {
+			throw rejected.get();
 		}
 		return EmailVerificationExampleDto.ConfirmResponse.builder()
 														  .maskedEmail(MaskingUtils.email(request.getEmail()))
 														  .verifiedAt(now)
 														  .build();
+	}
+
+	/** 아무도 다시 요청·확인하지 않은 만료 코드가 쌓이지 않게 정리 — 실서비스는 Redis TTL 이 대신한다 (값이 바뀐 항목은 지우지 않는다) */
+	private void removeExpired(LocalDateTime now) {
+		pendings.values().removeIf(pending -> now.isAfter(pending.getExpiresAt()));
 	}
 
 	private String body(String code) {

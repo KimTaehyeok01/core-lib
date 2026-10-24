@@ -15,14 +15,16 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** 예제 앱 진입점 — @Async 로 접수 알림을 보내 traceId 가 다른 스레드로 넘어가는 것을 보여준다 */
+/** 예제 앱 진입점 — @Async 로 접수 알림을 보내 traceId 가 다른 스레드로 넘어가는 것을 보여준다. @Scheduled 는 IP 별 접수 기록 정리용 */
 @EnableAsync
+@EnableScheduling
 @SpringBootApplication
 public class WebExampleApplication {
 

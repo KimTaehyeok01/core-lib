@@ -41,7 +41,7 @@ public class PostExampleDto {
 
 	// === 글 (저장 모델) — 실서비스는 게시글 테이블 ===
 	@Getter
-	@Builder
+	@Builder(toBuilder = true)
 	@AllArgsConstructor(access = AccessLevel.PRIVATE)
 	public static class Post {
 
@@ -60,6 +60,9 @@ public class PostExampleDto {
 
 		/** 삭제 PIN — 비회원 글 삭제용 */
 		private final String deletePin;
+
+		/** 삭제 PIN 틀린 횟수 — 상한에 닿으면 PIN 삭제를 잠근다 */
+		private final int deleteFailCount;
 
 		private final LocalDateTime createdAt;
 	}

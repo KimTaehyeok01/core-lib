@@ -62,7 +62,6 @@ example/*/src/main/resources/
 | 전역 예외 처리 | CoreGlobalException | CoreExceptionHandler (common 모듈) | 실제 클래스명 |
 | 신규 파일 첫 줄 주석 | 역할 한 줄 주석 | 넣지 않음 | 사용자 지시 |
 | 예제 계층 | Controller/Service/Repository/Entity | example 은 Controller/Service/Dto 만, 저장은 메모리 | 사용 가이드용 예제, core 는 상태 저장 금지 |
-| 브랜치 | develop 에서 feat/* 분기 | main 에서 feat/* 분기 (develop 없음) | 개인 저장소 |
 
 # 공용 도메인
 <!-- 선언 없으면 하네스 표준 적용 -->

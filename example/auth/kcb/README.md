@@ -14,9 +14,9 @@ export KCB_RETURN_URL=https://내도메인/kcb/return
 화면: http://localhost:8109 — jar 가 없으면 [본인확인 하기] 에서 "KCB OkCert 모듈이 없습니다" 안내가 뜬다.
 
 ## 흐름
-1. `POST /api/kcb/start` — 모듈 토큰(MDL_TKN) 발급, 팝업 form 값(tc·cp_cd·mdl_tkn·target_id) 반환
+1. `POST /api/kcb/start` — 모듈 토큰(MDL_TKN) 발급, 팝업 form 값(tc·cp_cd·mdl_tkn·target_id) 반환. 발급한 mdl_tkn 은 **세션에도 저장**
 2. 화면이 팝업 창에 form 을 POST (`https://safe.ok-name.co.kr/CommonSvl`)
-3. KCB → `GET /kcb/return?mdl_tkn=` — 결과 확인(토큰당 1회)
+3. KCB → `GET /kcb/return?mdl_tkn=` — 세션의 mdl_tkn 과 같을 때만 결과 확인, 세션 토큰은 1회 소비 (없거나 다르면 KCB 조회 없이 실패 화면 — 로그인 CSRF 차단)
 4. 서비스가 CI 해시로 회원 조회 → 있으면 **로그인**(휴대폰번호 갱신), 없으면 **가입** (만 14세 미만 차단)
 5. `/done.html` 이 부모 창에 알림 → `GET /api/kcb/result` 로 마스킹된 결과, `GET /api/kcb/members/list` 로 회원 목록
 

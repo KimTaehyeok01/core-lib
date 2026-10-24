@@ -26,3 +26,4 @@ curl -X POST localhost:8101/api/posts/delete -H 'Content-Type: application/json'
 ## 소비 프로젝트에 옮길 것
 - `service/PostExampleService` — 글 테이블만 DB 로 바꾸면 된다
 - 외부에 노출되는 식별자는 순번 대신 추측 불가 코드, PIN 비교는 상수 시간(`MessageDigest.isEqual`)
+- 삭제 PIN 은 글마다 5회 틀리면 잠근다(423 `POST_DELETE_LOCKED`) — 잠금 확인·비교·횟수 증가를 한 번의 원자 연산(DB 는 조건부 UPDATE)으로

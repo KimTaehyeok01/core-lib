@@ -6,10 +6,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.corelib.common.startup.StartupReport;
 import com.corelib.common.startup.StartupReporter;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import com.corelib.webclient.fixture.MockHttpServer;
 import com.corelib.webclient.fixture.MockHttpServer.MockResponse;
 import com.jayway.jsonpath.JsonPath;
@@ -76,6 +86,12 @@ class TossExampleTest {
 			   .andExpect(jsonPath("$.data.status").value("PAID"))
 			   .andExpect(jsonPath("$.data.paymentKey").value("pk_1"));
 
+		// 새로고침 재진입 - 승인 완료 주문은 결과 화면, 토스 재호출 없음
+		int afterConfirm = TOSS.requestCount();
+		mockMvc.perform(get("/toss/success").param("paymentKey", "pk_1").param("orderId", orderId).param("amount", "15000"))
+			   .andExpect(header().string("Location", "/result.html?orderId=" + orderId));
+		assertThat(TOSS.requestCount()).isEqualTo(afterConfirm);
+
 		TOSS.enqueue(MockResponse.ok(payment(orderId, "PARTIAL_CANCELED", 15000, 10000)));
 		mockMvc.perform(post("/api/toss/orders/cancel").contentType(MediaType.APPLICATION_JSON)
 													   .content("{\"orderId\":\"" + orderId + "\",\"reason\":\"부분 환불\",\"cancelAmount\":5000}"))
@@ -86,10 +102,36 @@ class TossExampleTest {
 		mockMvc.perform(post("/api/toss/orders/cancel").contentType(MediaType.APPLICATION_JSON)
 													   .content("{\"orderId\":\"" + orderId + "\",\"reason\":\"고객 변심\"}"))
 			   .andExpect(jsonPath("$.data.status").value("CANCELED"));
+
+		// 취소된 주문의 재진입 - 결제가 성립했던 주문이라 결과 화면에서 상태 조회
+		mockMvc.perform(get("/toss/success").param("paymentKey", "pk_1").param("orderId", orderId).param("amount", "15000"))
+			   .andExpect(header().string("Location", "/result.html?orderId=" + orderId));
 	}
 
 	@Test
-	@DisplayName("successUrl 금액 위변조 - 토스 호출 없이 실패 처리")
+	@DisplayName("토스 승인 거절(4xx) - 콜백에 서명이 없어 FAILED 대신 READY 로 되돌림, 화면은 고정 문구 → 재승인 가능")
+	void rejectedKeepsReady() throws Exception {
+		String orderId = createOrder(15000);
+		TOSS.enqueue(MockResponse.status(404, "{\"code\":\"NOT_FOUND_PAYMENT\",\"message\":\"존재하지 않는 결제 정보 입니다.\"}"));
+
+		String location = mockMvc.perform(get("/toss/success").param("paymentKey", "pk_fake").param("orderId", orderId).param("amount", "15000"))
+								 .andReturn().getResponse().getHeader("Location");
+		assertThat(URLDecoder.decode(location, StandardCharsets.UTF_8))
+			.startsWith("/fail.html")
+			.contains("결제가 승인되지 않았습니다.")
+			.doesNotContain("존재하지 않는 결제 정보");
+		mockMvc.perform(get("/api/toss/orders/detail").param("orderId", orderId))
+			   .andExpect(jsonPath("$.data.status").value("READY"));
+
+		TOSS.enqueue(MockResponse.ok(payment(orderId, "DONE", 15000, 15000)));
+		mockMvc.perform(get("/toss/success").param("paymentKey", "pk_1").param("orderId", orderId).param("amount", "15000"))
+			   .andExpect(header().string("Location", "/result.html?orderId=" + orderId));
+		mockMvc.perform(get("/api/toss/orders/detail").param("orderId", orderId))
+			   .andExpect(jsonPath("$.data.status").value("PAID"));
+	}
+
+	@Test
+	@DisplayName("successUrl 금액 위변조 - 토스 호출 없이 실패 화면, 서명 없는 값이라 READY 유지 → 정상 콜백으로 재승인 가능")
 	void tamperedAmount() throws Exception {
 		String orderId = createOrder(15000);
 		int before = TOSS.requestCount();
@@ -98,7 +140,107 @@ class TossExampleTest {
 			   .andExpect(header().string("Location", startsWith("/fail.html")));
 		assertThat(TOSS.requestCount()).isEqualTo(before);
 		mockMvc.perform(get("/api/toss/orders/detail").param("orderId", orderId))
-			   .andExpect(jsonPath("$.data.status").value("FAILED"));
+			   .andExpect(jsonPath("$.data.status").value("READY"));
+
+		TOSS.enqueue(MockResponse.ok(payment(orderId, "DONE", 15000, 15000)));
+		mockMvc.perform(get("/toss/success").param("paymentKey", "pk_1").param("orderId", orderId).param("amount", "15000"))
+			   .andExpect(header().string("Location", "/result.html?orderId=" + orderId));
+	}
+
+	@Test
+	@DisplayName("승인 콜백 동시 2건 - 선점한 1건만 토스 승인 호출, PAID·paymentKey 유지")
+	void concurrentConfirm() throws Exception {
+		String orderId = createOrder(15000);
+		int before = TOSS.requestCount();
+		// 승인 응답을 늦춰 첫 요청이 토스 호출 중일 때 두 번째 콜백이 들어오게 한다
+		TOSS.enqueue(MockResponse.ok(payment(orderId, "DONE", 15000, 15000)).delayed(Duration.ofMillis(500)));
+
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		CountDownLatch start = new CountDownLatch(1);
+		List<String> locations = new ArrayList<>();
+		try {
+			List<Future<String>> futures = new ArrayList<>();
+			for (int i = 0; i < 2; i++) {
+				futures.add(executor.submit(() -> {
+					start.await();
+					return mockMvc.perform(get("/toss/success").param("paymentKey", "pk_1").param("orderId", orderId).param("amount", "15000"))
+								  .andReturn().getResponse().getHeader("Location");
+				}));
+			}
+			start.countDown();
+			for (Future<String> future : futures) {
+				locations.add(future.get(10, TimeUnit.SECONDS));
+			}
+		} finally {
+			executor.shutdownNow();
+		}
+
+		// 패자는 PROCESSING 또는 PAID 를 보고 결과 화면으로 간다
+		assertThat(locations).containsOnly("/result.html?orderId=" + orderId);
+		assertThat(TOSS.requestCount()).isEqualTo(before + 1);
+		mockMvc.perform(get("/api/toss/orders/detail").param("orderId", orderId))
+			   .andExpect(jsonPath("$.data.status").value("PAID"))
+			   .andExpect(jsonPath("$.data.paymentKey").value("pk_1"));
+	}
+
+	@Test
+	@DisplayName("취소 timeout - CANCEL_UNKNOWN 으로 기록, 재취소는 토스 호출 없이 400")
+	void cancelResultUnknown() throws Exception {
+		String orderId = createOrder(15000);
+		TOSS.enqueue(MockResponse.ok(payment(orderId, "DONE", 15000, 15000)));
+		mockMvc.perform(get("/toss/success").param("paymentKey", "pk_1").param("orderId", orderId).param("amount", "15000"))
+			   .andExpect(header().string("Location", "/result.html?orderId=" + orderId));
+
+		int before = TOSS.requestCount();
+		TOSS.enqueue(MockResponse.ok(payment(orderId, "CANCELED", 15000, 0)).delayed(Duration.ofSeconds(3)));
+		mockMvc.perform(post("/api/toss/orders/cancel").contentType(MediaType.APPLICATION_JSON)
+													   .content("{\"orderId\":\"" + orderId + "\",\"reason\":\"고객 변심\"}"))
+			   .andExpect(jsonPath("$.code").value("TOSS-UNKNOWN"));
+		mockMvc.perform(get("/api/toss/orders/detail").param("orderId", orderId))
+			   .andExpect(jsonPath("$.data.status").value("CANCEL_UNKNOWN"))
+			   .andExpect(jsonPath("$.data.paymentKey").value("pk_1"));
+
+		mockMvc.perform(post("/api/toss/orders/cancel").contentType(MediaType.APPLICATION_JSON)
+													   .content("{\"orderId\":\"" + orderId + "\",\"reason\":\"고객 변심\"}"))
+			   .andExpect(status().isBadRequest());
+		assertThat(TOSS.requestCount()).isEqualTo(before + 1);
+	}
+
+	@Test
+	@DisplayName("successUrl 파라미터 누락·형식 오류 - JSON 400 이 아니라 실패 화면, 토스 호출 없음")
+	void invalidCallbackParams() throws Exception {
+		String orderId = createOrder(15000);
+		int before = TOSS.requestCount();
+
+		mockMvc.perform(get("/toss/success"))
+			   .andExpect(status().isFound())
+			   .andExpect(header().string("Location", startsWith("/fail.html")));
+		mockMvc.perform(get("/toss/success").param("paymentKey", "pk_1").param("orderId", orderId).param("amount", "abc"))
+			   .andExpect(status().isFound())
+			   .andExpect(header().string("Location", startsWith("/fail.html")));
+		// 선점 뒤 모듈 요청 검증(@NotBlank)에서 거절되는 값 - PROCESSING 에서 READY 로 되돌린다
+		mockMvc.perform(get("/toss/success").param("paymentKey", "\u0000").param("orderId", orderId).param("amount", "15000"))
+			   .andExpect(status().isFound())
+			   .andExpect(header().string("Location", startsWith("/fail.html")));
+		assertThat(TOSS.requestCount()).isEqualTo(before);
+		mockMvc.perform(get("/api/toss/orders/detail").param("orderId", orderId))
+			   .andExpect(jsonPath("$.data.status").value("READY"));
+	}
+
+	@Test
+	@DisplayName("failUrl 은 서명 없는 브라우저 입력 - 주문은 READY 유지, 화면 문구는 쿼리 message 가 아닌 서버 고정 문구")
+	void failUrlKeepsReady() throws Exception {
+		String orderId = createOrder(15000);
+
+		String location = mockMvc.perform(get("/toss/fail").param("code", "REJECT_CARD_COMPANY").param("message", "고객센터로 연락하세요")
+														   .param("orderId", orderId))
+								 .andReturn().getResponse().getHeader("Location");
+		assertThat(URLDecoder.decode(location, StandardCharsets.UTF_8))
+			.startsWith("/fail.html?code=REJECT_CARD_COMPANY")
+			.contains("결제가 완료되지 않았습니다.")
+			.doesNotContain("고객센터로 연락하세요");
+		mockMvc.perform(get("/api/toss/orders/detail").param("orderId", orderId))
+			   .andExpect(jsonPath("$.data.status").value("READY"));
 	}
 
 	@Test

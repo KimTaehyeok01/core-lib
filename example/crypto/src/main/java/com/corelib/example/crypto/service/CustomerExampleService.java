@@ -12,6 +12,7 @@ import com.corelib.example.crypto.dto.CustomerExampleDto;
 import com.corelib.lang.MaskingUtils;
 import com.corelib.lang.StringUtils;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -44,22 +45,35 @@ public class CustomerExampleService {
 
 	private static final ErrorCode EMAIL_DUPLICATED = ErrorCode.of("CUSTOMER_EMAIL_DUPLICATED", "이미 가입된 이메일입니다.", 409);
 	private static final ErrorCode LOGIN_FAILED = ErrorCode.of("CUSTOMER_LOGIN_FAILED", "이메일 또는 비밀번호가 올바르지 않습니다.", 401);
+	private static final ErrorCode LOGIN_LOCKED = ErrorCode.of("CUSTOMER_LOGIN_LOCKED", "로그인 시도가 너무 많습니다. 5분 후 다시 시도해 주세요.", 429);
+	private static final int MAX_LOGIN_FAILS = 5;
+	private static final Duration LOGIN_LOCK_TIME = Duration.ofMinutes(5);
 
-	/** 실서비스는 고객 테이블 (email_index unique) — 예제라 메모리에 둔다 */
+	/**
+	 * 실서비스는 고객 테이블 (email_index unique) — 예제라 메모리에 둔다.
+	 * 변경은 computeIfPresent 로 최신 값에 원자 적용 — 실서비스는 DB 조건부 UPDATE(바꿀 컬럼만 SET) 로 같은 원자성 확보
+	 */
 	private final Map<String, CustomerExampleDto.Customer> customersByEmailIndex = new ConcurrentHashMap<>();
+	/** 키: 이메일 인덱스. 증가·잠금은 compute 로 원자 처리 — 실서비스는 DB 조건부 UPDATE·Redis INCR 로 같은 원자성 확보 */
+	private final Map<String, CustomerExampleDto.LoginFailure> loginFailuresByEmailIndex = new ConcurrentHashMap<>();
 	private final AtomicLong sequence = new AtomicLong();
+	/** 없는 이메일 로그인에도 같은 PBKDF2 를 계산할 salt — 응답 시간으로 가입 여부를 알 수 없게 */
+	private final byte[] dummySalt = AesUtils.generateKey(SALT_BYTES);
 
 	private final byte[] aesKey;
 	private final byte[] indexKey;
+	private final boolean isDebugEndpointsEnabled;
 
 	/**
 	 * 키는 설정(환경변수·KMS)으로만 받는다 — 코드·yml 에 리터럴 금지.
 	 * 예제라 비어 있으면 기동할 때 임시 키를 만든다 (재시작하면 이전 암호문은 못 푼다).
 	 */
 	public CustomerExampleService(@Value("${example.crypto.aes-key:}") String aesKeyBase64,
-								  @Value("${example.crypto.index-key:}") String indexKeyBase64) {
+								  @Value("${example.crypto.index-key:}") String indexKeyBase64,
+								  @Value("${example.crypto.debug-endpoints:false}") boolean isDebugEndpointsEnabled) {
 		this.aesKey = loadKey(aesKeyBase64, "example.crypto.aes-key");
 		this.indexKey = loadKey(indexKeyBase64, "example.crypto.index-key");
+		this.isDebugEndpointsEnabled = isDebugEndpointsEnabled;
 	}
 
 	public CustomerExampleDto.CustomerResponse join(CustomerExampleDto.JoinRequest request) {
@@ -84,7 +98,7 @@ public class CustomerExampleService {
 		return toResponse(customer);
 	}
 
-	/** 로그인 — 이메일이 없을 때와 비밀번호가 틀릴 때 같은 응답 (가입 여부 노출 방지) */
+	/** 로그인 — 이메일이 없을 때와 비밀번호가 틀릴 때 같은 응답·같은 계산량 (가입 여부 노출 방지). 5번 틀리면 5분 잠금(429) */
 	public CustomerExampleDto.CustomerResponse login(CustomerExampleDto.LoginRequest request) {
 		ValidateUtils.validate(request);
 		return toResponse(authenticate(request.getEmail(), request.getPassword()));
@@ -94,8 +108,10 @@ public class CustomerExampleService {
 	public CustomerExampleDto.CustomerResponse changeMobile(CustomerExampleDto.ChangeMobileRequest request) {
 		ValidateUtils.validate(request);
 		CustomerExampleDto.Customer customer = authenticate(request.getEmail(), request.getPassword());
-		CustomerExampleDto.Customer updated = customer.toBuilder().encryptedMobileNo(encrypt(digitsOf(request.getMobileNo()))).build();
-		customersByEmailIndex.put(updated.getEmailIndex(), updated);
+		String encryptedMobileNo = encrypt(digitsOf(request.getMobileNo()));
+		// 처음 읽은 스냅샷으로 덮지 않고 최신 값의 휴대폰만 바꾼다 — 그 사이 다른 변경이 있어도 유실되지 않게
+		CustomerExampleDto.Customer updated = customersByEmailIndex.computeIfPresent(customer.getEmailIndex(),
+			(emailIndex, current) -> current.toBuilder().encryptedMobileNo(encryptedMobileNo).build());
 		return toResponse(updated);
 	}
 
@@ -106,8 +122,11 @@ public class CustomerExampleService {
 									.toList();
 	}
 
-	/** DB 에 실제로 저장되는 모습 — 원문이 없다는 것을 확인하는 용도 */
+	/** DB 에 실제로 저장되는 모습 — 원문이 없다는 것을 확인하는 용도. example.crypto.debug-endpoints=true 일 때만, 아니면 없는 경로와 같은 404 */
 	public List<CustomerExampleDto.StoredRow> storedRows() {
+		if (!isDebugEndpointsEnabled) {
+			throw new CoreException(CommonErrorCode.NOT_FOUND);
+		}
 		return customersByEmailIndex.values().stream()
 									.sorted(Comparator.comparing(CustomerExampleDto.Customer::getCustomerId))
 									.map(customer -> CustomerExampleDto.StoredRow.builder()
@@ -115,21 +134,39 @@ public class CustomerExampleService {
 																				 .emailIndex(customer.getEmailIndex())
 																				 .encryptedEmail(customer.getEncryptedEmail())
 																				 .encryptedMobileNo(customer.getEncryptedMobileNo())
-																				 .passwordHash(customer.getPasswordHash())
 																				 .build())
 									.toList();
 	}
 
 	private CustomerExampleDto.Customer authenticate(String email, String password) {
-		CustomerExampleDto.Customer customer = customersByEmailIndex.get(emailIndex(email));
+		String emailIndex = emailIndex(email);
+		countLoginAttempt(emailIndex);
+		CustomerExampleDto.Customer customer = customersByEmailIndex.get(emailIndex);
+		byte[] salt = customer != null ? Base64Utils.decodeUrl(customer.getPasswordSalt()) : dummySalt;
+		String expected = hashPassword(password, salt);
 		if (customer == null) {
 			throw new CoreException(LOGIN_FAILED);
 		}
-		String expected = hashPassword(password, Base64Utils.decodeUrl(customer.getPasswordSalt()));
 		if (!HmacUtils.isEqual(customer.getPasswordHash(), expected)) {
 			throw new CoreException(LOGIN_FAILED).addErrorLogData("customerId", customer.getCustomerId());
 		}
+		loginFailuresByEmailIndex.remove(emailIndex);
 		return customer;
+	}
+
+	/** 비밀번호를 계산하기 전에 시도를 먼저 센다 — 동시에 몰려와도 잠금 전까지 최대 5번만 계산. 잠금 중이면 계산 없이 429 */
+	private void countLoginAttempt(String emailIndex) {
+		LocalDateTime now = LocalDateTime.now();
+		loginFailuresByEmailIndex.compute(emailIndex, (k, failure) -> {
+			if (failure != null && failure.getLockExpiresAt() != null && now.isBefore(failure.getLockExpiresAt())) {
+				throw new CoreException(LOGIN_LOCKED);    // 예외면 기존 값 유지
+			}
+			int failCount = failure == null || failure.getLockExpiresAt() != null ? 1 : failure.getFailCount() + 1;    // 잠금이 풀렸으면 새로 센다
+			return CustomerExampleDto.LoginFailure.builder()
+												  .failCount(failCount)
+												  .lockExpiresAt(failCount >= MAX_LOGIN_FAILS ? now.plus(LOGIN_LOCK_TIME) : null)
+												  .build();
+		});
 	}
 
 	private CustomerExampleDto.CustomerResponse toResponse(CustomerExampleDto.Customer customer) {

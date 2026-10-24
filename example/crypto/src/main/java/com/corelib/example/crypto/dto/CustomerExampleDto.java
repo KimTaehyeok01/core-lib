@@ -113,7 +113,20 @@ public class CustomerExampleDto {
 		private String mobileNo;
 	}
 
-	// === 저장된 모습 확인용 (관리 화면·디버깅) — 암호문만 나간다 ===
+	// === 로그인 실패 (저장 모델) — 실서비스는 Redis(INCR + TTL)·테이블 ===
+	@Getter
+	@Builder
+	@AllArgsConstructor(access = AccessLevel.PRIVATE)
+	public static class LoginFailure {
+
+		/** 연속 실패 횟수 — 비밀번호 확인 전에 먼저 센다, 성공하면 기록을 지운다 */
+		private final Integer failCount;
+
+		/** 이 시각까지 잠금 (상한에 닿기 전이면 null) */
+		private final LocalDateTime lockExpiresAt;
+	}
+
+	// === 저장된 모습 확인용 (디버깅) — 암호문만 나간다. 비밀번호 해시는 오프라인 대입 재료라 내보내지 않는다 ===
 	@Getter
 	@Builder
 	@AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -126,7 +139,5 @@ public class CustomerExampleDto {
 		private final String encryptedEmail;
 
 		private final String encryptedMobileNo;
-
-		private final String passwordHash;
 	}
 }

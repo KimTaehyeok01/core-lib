@@ -81,6 +81,19 @@ public class AuthExampleDto {
 		private final LocalDateTime joinedAt;
 	}
 
+	// === 로그인 실패 (저장 모델) — 실서비스는 Redis(INCR + TTL)·테이블 ===
+	@Getter
+	@Builder
+	@AllArgsConstructor(access = AccessLevel.PRIVATE)
+	public static class LoginFailure {
+
+		/** 연속 실패 횟수 — 비밀번호 확인 전에 먼저 센다, 성공하면 기록을 지운다 */
+		private final Integer failCount;
+
+		/** 이 시각까지 잠금 (상한에 닿기 전이면 null) */
+		private final LocalDateTime lockExpiresAt;
+	}
+
 	// === 내 정보 / 회원 목록 항목 ===
 	@Getter
 	@Builder

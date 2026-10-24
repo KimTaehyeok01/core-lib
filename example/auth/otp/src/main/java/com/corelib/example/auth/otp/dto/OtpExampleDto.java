@@ -20,6 +20,7 @@ public class OtpExampleDto {
 	@NoArgsConstructor
 	public static class SetupRequest {
 
+		/** 실서비스는 인증된 principal 에서 가져온다 — 요청 본문으로 받으면 남의 2FA 를 선점할 수 있다 */
 		@NotBlank
 		@Size(max = 50)
 		private String memberId;
@@ -49,6 +50,7 @@ public class OtpExampleDto {
 	@NoArgsConstructor
 	public static class CodeRequest {
 
+		/** 실서비스는 인증된 principal 에서 가져온다 — 요청 본문으로 받으면 남의 2FA 를 선점할 수 있다 */
 		@NotBlank
 		private String memberId;
 

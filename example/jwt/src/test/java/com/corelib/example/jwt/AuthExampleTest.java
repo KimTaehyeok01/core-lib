@@ -1,5 +1,6 @@
 package com.corelib.example.jwt;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -8,6 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.corelib.crypto.PemUtils;
 import com.corelib.crypto.RsaUtils;
 import com.jayway.jsonpath.JsonPath;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,10 +46,40 @@ class AuthExampleTest {
 		return mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(json));
 	}
 
+	private ResultActions login(String email, String password) throws Exception {
+		return postJson("/api/auth/login", "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}");
+	}
+
+	/** 같은 요청을 threads 개 스레드에서 한꺼번에 보내고 응답 본문을 모은다 — 모두 준비된 뒤 동시에 출발 */
+	private static List<String> concurrently(int threads, Callable<String> request) throws Exception {
+		ExecutorService executor = Executors.newFixedThreadPool(threads);
+		CountDownLatch ready = new CountDownLatch(threads);
+		CountDownLatch start = new CountDownLatch(1);
+		try {
+			List<Future<String>> futures = new ArrayList<>();
+			for (int i = 0; i < threads; i++) {
+				futures.add(executor.submit(() -> {
+					ready.countDown();
+					start.await();
+					return request.call();
+				}));
+			}
+			ready.await();
+			start.countDown();
+			List<String> bodies = new ArrayList<>();
+			for (Future<String> future : futures) {
+				bodies.add(future.get(30, TimeUnit.SECONDS));
+			}
+			return bodies;
+		} finally {
+			executor.shutdownNow();
+		}
+	}
+
 	/** 가입 후 로그인 — 토큰 응답 JSON */
 	private String signupAndLogin(String email) throws Exception {
 		postJson("/api/auth/signup", "{\"email\":\"" + email + "\",\"password\":\"pass-word-1\",\"nickname\":\"길동\"}").andExpect(status().isOk());
-		return postJson("/api/auth/login", "{\"email\":\"" + email + "\",\"password\":\"pass-word-1\"}")
+		return login(email, "pass-word-1")
 			.andExpect(jsonPath("$.data.tokenType").value("Bearer"))
 			.andExpect(jsonPath("$.data.accessTokenExpiresIn").value(1800))
 			.andReturn().getResponse().getContentAsString();
@@ -81,6 +120,50 @@ class AuthExampleTest {
 			.andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("REFRESH_REJECTED"));
 		postJson("/api/auth/refresh", "{\"refreshToken\":\"" + newRefresh + "\"}")
 			.andExpect(status().isUnauthorized());    // 재사용이 감지돼 새 토큰도 무효 — 다시 로그인
+	}
+
+	@Test
+	@DisplayName("같은 리프레시 동시 2건 — 1건만 새 쌍, 나머지는 재사용으로 판정돼 이긴 쪽 새 토큰까지 폐기")
+	void concurrentRefresh() throws Exception {
+		String refresh = JsonPath.read(signupAndLogin("race@example.com"), "$.data.refreshToken");
+
+		List<String> bodies = concurrently(2, () -> postJson("/api/auth/refresh", "{\"refreshToken\":\"" + refresh + "\"}")
+			.andReturn().getResponse().getContentAsString());
+
+		assertThat(bodies).extracting(body -> JsonPath.<String>read(body, "$.code")).containsExactlyInAnyOrder(null, "REFRESH_REJECTED");
+		String winner = bodies.stream().filter(body -> JsonPath.<Boolean>read(body, "$.success")).findFirst().orElseThrow();
+		postJson("/api/auth/refresh", "{\"refreshToken\":\"" + JsonPath.read(winner, "$.data.refreshToken") + "\"}")
+			.andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("REFRESH_REJECTED"));
+	}
+
+	@Test
+	@DisplayName("두 기기 로그인 — 각자 갱신 성공 / 한 기기에서 옛 리프레시를 재사용하면 두 기기 모두 폐기")
+	void twoDevices() throws Exception {
+		String phone = signupAndLogin("multi@example.com");
+		String laptop = login("multi@example.com", "pass-word-1").andReturn().getResponse().getContentAsString();
+		String phoneOld = JsonPath.read(phone, "$.data.refreshToken");
+
+		String phoneNew = JsonPath.read(postJson("/api/auth/refresh", "{\"refreshToken\":\"" + phoneOld + "\"}")
+			.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.data.refreshToken");
+		String laptopNew = JsonPath.read(postJson("/api/auth/refresh", "{\"refreshToken\":\"" + JsonPath.read(laptop, "$.data.refreshToken") + "\"}")
+			.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.data.refreshToken");
+
+		postJson("/api/auth/refresh", "{\"refreshToken\":\"" + phoneOld + "\"}")
+			.andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("REFRESH_REJECTED"));
+		postJson("/api/auth/refresh", "{\"refreshToken\":\"" + phoneNew + "\"}").andExpect(status().isUnauthorized());
+		postJson("/api/auth/refresh", "{\"refreshToken\":\"" + laptopNew + "\"}").andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	@DisplayName("로그인 5번 실패 — 잠금(429), 맞는 비밀번호도 거부 / 없는 이메일도 똑같이 잠금")
+	void loginLocked() throws Exception {
+		signupAndLogin("lock@example.com");
+		for (String email : List.of("lock@example.com", "ghost-lock@example.com")) {
+			for (int i = 1; i <= 5; i++) {
+				login(email, "nope-nope").andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
+			}
+			login(email, "pass-word-1").andExpect(status().isTooManyRequests()).andExpect(jsonPath("$.code").value("LOGIN_LOCKED"));
+		}
 	}
 
 	@Test

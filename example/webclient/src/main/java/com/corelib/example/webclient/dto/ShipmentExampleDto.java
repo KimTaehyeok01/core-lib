@@ -18,6 +18,8 @@ public class ShipmentExampleDto {
 
 	/** 우리 쪽 배송 상태 */
 	public enum ShipmentStatus {
+		/** 택배사에 접수 요청 중 — 이 상태를 선점한 요청만 택배사를 호출한다. 실서비스는 오래된 PENDING 을 배치가 주문번호 조회로 확정 */
+		PENDING,
 		/** 택배사 접수 완료 — 송장번호 있음 */
 		REGISTERED,
 		/** 접수 실패 (거절·미전송) — 다시 접수할 수 있다 */

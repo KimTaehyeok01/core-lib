@@ -29,10 +29,12 @@ public class FakeCourierService {
 	/** @return 접수된 송장 — 이미 접수된 주문번호면 empty */
 	public Optional<ShipmentExampleDto.CourierShipment> register(ShipmentExampleDto.CourierRegisterRequest request) {
 		String invoiceNo = "INV" + RandomStringUtils.randomNumeric(10);
+		// 진행 단계를 먼저 넣고 주문번호를 연결한다 — 주문번호로는 찾히는데 진행 단계가 없는 틈(조회 NPE)이 생기지 않게
+		progressByInvoiceNo.put(invoiceNo, 0);
 		if (invoiceByOrderNo.putIfAbsent(request.getOrderNo(), invoiceNo) != null) {
+			progressByInvoiceNo.remove(invoiceNo);
 			return Optional.empty();
 		}
-		progressByInvoiceNo.put(invoiceNo, 0);
 		return Optional.of(shipment(request.getOrderNo(), invoiceNo, 0));
 	}
 

@@ -15,9 +15,11 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
@@ -34,10 +36,14 @@ import org.springframework.stereotype.Service;
 public class InquiryExampleService {
 
 	private static final ErrorCode TOO_MANY = ErrorCode.of("INQUIRY_TOO_MANY", "잠시 후 다시 문의해 주세요.", 429);
+	private static final ErrorCode ALREADY_ANSWERED = ErrorCode.of("INQUIRY_ALREADY_ANSWERED", "이미 답변한 문의입니다.", 409);
 
-	/** 실서비스는 문의 테이블 — 예제라 메모리에 둔다 */
+	/**
+	 * 실서비스는 문의 테이블 — 예제라 메모리에 둔다.
+	 * 실서비스는 DB 조건부 UPDATE(WHERE status = 'RECEIVED') 로 같은 원자성 확보
+	 */
 	private final Map<Long, InquiryExampleDto.Inquiry> inquiries = new ConcurrentHashMap<>();
-	/** 실서비스는 Redis(만료 키) — IP 별 최근 접수 시각 */
+	/** 실서비스는 Redis(만료 키) — IP 별 최근 접수 시각. deque 는 이 맵의 compute 안에서만 읽고 고친다 */
 	private final Map<String, Deque<LocalDateTime>> recentByIp = new ConcurrentHashMap<>();
 	private final AtomicLong sequence = new AtomicLong();
 	private final InquiryNotificationService notificationService;
@@ -92,30 +98,55 @@ public class InquiryExampleService {
 						.toList();
 	}
 
-	/** 관리자 — 답변 등록 */
+	/**
+	 * 관리자 — 답변 등록. 상태 확인과 RECEIVED → ANSWERED 전이를 computeIfPresent 한 번으로 처리한다
+	 * — 두 관리자가 동시에 답변해도 1건만 저장되고 나머지는 409 (나중 답변이 앞 답변을 덮지 않는다).
+	 */
 	public void answer(InquiryExampleDto.AnswerRequest request) {
 		ValidateUtils.validate(request);
-		InquiryExampleDto.Inquiry inquiry = inquiries.get(request.getInquiryNo());
-		if (inquiry == null) {
+		// compute 안에서 던지면 저장값은 그대로 남는다
+		InquiryExampleDto.Inquiry answered = inquiries.computeIfPresent(request.getInquiryNo(), (inquiryNo, inquiry) -> {
+			if (inquiry.getStatus() == InquiryExampleDto.Status.ANSWERED) {
+				throw new CoreException(ALREADY_ANSWERED).addErrorLogData("inquiryNo", inquiryNo);
+			}
+			return inquiry.toBuilder().status(InquiryExampleDto.Status.ANSWERED).answer(request.getAnswer()).build();
+		});
+		if (answered == null) {
 			throw new CoreException(CommonErrorCode.NOT_FOUND, "문의를 찾을 수 없습니다.");
 		}
-		if (inquiry.getStatus() == InquiryExampleDto.Status.ANSWERED) {
-			throw new CoreException(CommonErrorCode.BAD_REQUEST, "이미 답변한 문의입니다.");
-		}
-		inquiries.put(inquiry.getInquiryNo(), inquiry.toBuilder().status(InquiryExampleDto.Status.ANSWERED).answer(request.getAnswer()).build());
 	}
 
-	/** 같은 IP 의 최근 1분 접수 건수가 상한이면 429 */
+	/**
+	 * 최근 1분 접수가 없는 IP 키를 지운다 — 한 번 왔다 간 IP 가 맵에 계속 쌓이지 않게.
+	 * checkRate 와 같은 키 잠금(compute) 안에서 지우므로, 막 기록하려던 deque 를 지워 접수 기록을 잃는 일이 없다.
+	 */
+	@Scheduled(fixedDelay = 1, timeUnit = TimeUnit.MINUTES)
+	public void evictIdleIps() {
+		LocalDateTime threshold = DateTimeUtils.now().minusMinutes(1);
+		for (String clientIp : recentByIp.keySet()) {
+			recentByIp.computeIfPresent(clientIp, (ip, recent) -> {
+				pruneBefore(recent, threshold);
+				return recent.isEmpty() ? null : recent;
+			});
+		}
+	}
+
+	/** 같은 IP 의 최근 1분 접수 건수가 상한이면 429 — 같은 IP 동시 접수는 compute 의 키 잠금으로 줄 세운다 */
 	private void checkRate(String clientIp, LocalDateTime now) {
-		Deque<LocalDateTime> recent = recentByIp.computeIfAbsent(clientIp, ip -> new ArrayDeque<>());
-		synchronized (recent) {
-			while (!recent.isEmpty() && recent.peekFirst().isBefore(now.minusMinutes(1))) {
-				recent.pollFirst();
+		recentByIp.compute(clientIp, (ip, recent) -> {
+			Deque<LocalDateTime> window = recent == null ? new ArrayDeque<>() : recent;
+			pruneBefore(window, now.minusMinutes(1));
+			if (window.size() >= limitPerMinute) {
+				throw new CoreException(TOO_MANY).addErrorLogData("clientIp", ip);
 			}
-			if (recent.size() >= limitPerMinute) {
-				throw new CoreException(TOO_MANY).addErrorLogData("clientIp", clientIp);
-			}
-			recent.addLast(now);
+			window.addLast(now);
+			return window;
+		});
+	}
+
+	private static void pruneBefore(Deque<LocalDateTime> recent, LocalDateTime threshold) {
+		while (!recent.isEmpty() && recent.peekFirst().isBefore(threshold)) {
+			recent.pollFirst();
 		}
 	}
 }

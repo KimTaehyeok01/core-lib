@@ -39,7 +39,7 @@ public class CustomerExampleController {
 		return ApiResponse.success(customerExampleService.list());
 	}
 
-	/** 예제 확인용 — 실서비스에는 두지 않는다 */
+	/** 예제 확인용 — 인증 없는 디버그 API 라 example.crypto.debug-endpoints=true 일 때만 연다 (기본 404). 실서비스에는 두지 않는다 */
 	@GetMapping("/stored-rows")
 	public ApiResponse<List<CustomerExampleDto.StoredRow>> storedRows() {
 		return ApiResponse.success(customerExampleService.storedRows());
