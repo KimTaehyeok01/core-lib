@@ -42,9 +42,12 @@ public class AuthExampleDto {
 	public static class LoginRequest {
 
 		@NotBlank
+		@Email
+		@Size(max = 100)
 		private String email;
 
 		@NotBlank
+		@Size(max = 64)
 		private String password;
 	}
 

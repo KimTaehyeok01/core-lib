@@ -8,7 +8,13 @@ import com.corelib.common.error.ErrorCode;
 import com.corelib.common.exception.CoreException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import kcb.module.v3.OkCert;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,6 +26,7 @@ class KcbAuthUtilsTest {
 	Path tempDir;
 
 	private KcbAuthProperty property;
+	private KcbOkCertCaller caller;
 
 	@BeforeEach
 	void setUp() throws Exception {
@@ -32,7 +39,14 @@ class KcbAuthUtilsTest {
 		property.setSiteName("코어랩");
 		property.setSiteUrl("example.com");
 		property.validate();
-		KcbAuthUtils.initialize(property, new KcbOkCertCaller());
+		caller = new KcbOkCertCaller(property.getTimeout());
+		KcbAuthUtils.initialize(property, caller);
+	}
+
+	@AfterEach
+	void tearDown() {
+		OkCert.reset();
+		caller.shutdown();
 	}
 
 	private static ErrorCode errorCodeOf(Throwable e) {
@@ -125,7 +139,7 @@ class KcbAuthUtilsTest {
 	@Test
 	@DisplayName("KCB jar 없음 - MODULE_NOT_FOUND (설치 안내 메시지)")
 	void moduleNotFound() {
-		KcbAuthUtils.initialize(property, new KcbOkCertCaller("kcb.module.v3.Missing"));
+		KcbAuthUtils.initialize(property, new KcbOkCertCaller("kcb.module.v3.Missing", property.getTimeout()));
 
 		assertThatThrownBy(() -> KcbAuthUtils.start(null))
 			.satisfies(e -> {
@@ -153,5 +167,118 @@ class KcbAuthUtilsTest {
 		property.setCpCd(null);
 		assertThatThrownBy(property::validate)
 			.extracting(KcbAuthUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.INTERNAL_SERVER);
+	}
+
+	@Test
+	@DisplayName("KCB 응답 지연 - auth.kcb.timeout 에서 EXTERNAL_ERROR 로 끊고, 멈춘 호출 스레드는 인터럽트")
+	void timeout() throws Exception {
+		property.setTimeout(Duration.ofMillis(200));
+		KcbOkCertCaller slowCaller = new KcbOkCertCaller(property.getTimeout());
+		KcbAuthUtils.initialize(property, slowCaller);
+		OkCert.block = new CountDownLatch(1);
+
+		try {
+			long startedAt = System.nanoTime();
+			assertThatThrownBy(() -> KcbAuthUtils.confirm(KcbAuthDto.ConfirmRequest.builder().mdlTkn("tkn-1").build()))
+				.extracting(KcbAuthUtilsTest::errorCodeOf)
+				.isEqualTo(KcbAuthError.EXTERNAL_ERROR);
+			assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofSeconds(3));
+			assertThat(OkCert.interrupted.await(3, TimeUnit.SECONDS)).isTrue();
+		} finally {
+			slowCaller.shutdown();
+		}
+	}
+
+	@Test
+	@DisplayName("풀 포화 + 큐 가득 - 거절은 timeout 을 기다리지 않고 즉시 EXTERNAL_ERROR")
+	void poolSaturated_rejectedImmediately() throws Exception {
+		property.setTimeout(Duration.ofSeconds(10));
+		KcbOkCertCaller saturated = new KcbOkCertCaller(property.getTimeout());
+		KcbAuthUtils.initialize(property, saturated);
+		OkCert.block = new CountDownLatch(1);
+		OkCert.nextResponse = "{\"RSLT_CD\":\"B000\",\"MDL_TKN\":\"tkn-1\",\"CI\":\"c\",\"DI\":\"d\"}";
+
+		List<Thread> fillers = new ArrayList<>();
+		try {
+			// 풀(POOL_SIZE) + 큐(POOL_SIZE*2) 를 전부 채운다
+			int fillCount = KcbOkCertCaller.POOL_SIZE * 3;
+			for (int i = 0; i < fillCount; i++) {
+				Thread filler = new Thread(() -> {
+					try {
+						KcbAuthUtils.confirm(KcbAuthDto.ConfirmRequest.builder().mdlTkn("tkn-fill").build());
+					} catch (RuntimeException ignored) {
+						// gate 가 풀리면 돌아온다
+					}
+				}, "kcb-filler");
+				filler.setDaemon(true);
+				filler.start();
+				fillers.add(filler);
+			}
+			// 모든 submit 이 큐에 들어갈 때까지 짧게 대기
+			for (int wait = 0; wait < 50; wait++) {
+				long waiting = fillers.stream()
+					.filter(t -> t.getState() == Thread.State.WAITING || t.getState() == Thread.State.TIMED_WAITING)
+					.count();
+				if (waiting >= fillCount) {
+					break;
+				}
+				Thread.sleep(50);
+			}
+
+			long startedAt = System.nanoTime();
+			assertThatThrownBy(() -> KcbAuthUtils.confirm(KcbAuthDto.ConfirmRequest.builder().mdlTkn("tkn-reject").build()))
+				.extracting(KcbAuthUtilsTest::errorCodeOf)
+				.isEqualTo(KcbAuthError.EXTERNAL_ERROR);
+			// 10초 timeout 을 기다리지 않고 즉시 돌아와야 한다
+			assertThat(Duration.ofNanos(System.nanoTime() - startedAt)).isLessThan(Duration.ofSeconds(2));
+		} finally {
+			OkCert.block.countDown();
+			saturated.shutdown();
+			for (Thread filler : fillers) {
+				filler.join(TimeUnit.SECONDS.toMillis(2));
+			}
+		}
+	}
+
+	@Test
+	@DisplayName("popup-url - 외부 http 는 설정 오류(키 이름만), https·로컬 http 는 허용")
+	void popupUrlValidate() {
+		property.setPopupUrl("http://safe.ok-name.co.kr/CommonSvl");
+		assertThatThrownBy(property::validate)
+			.hasMessageContaining("auth.kcb.popup-url")
+			.hasMessageNotContaining("safe.ok-name.co.kr")
+			.extracting(KcbAuthUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.INTERNAL_SERVER);
+
+		property.setPopupUrl("http://localhost:9000/CommonSvl");
+		property.validate();
+	}
+
+	@Test
+	@DisplayName("설정 검증 - return-url 형식 위반·timeout 0 은 설정 오류")
+	void returnUrlAndTimeoutValidate() {
+		property.setReturnUrl("javascript:alert(1)");
+		assertThatThrownBy(property::validate).hasMessageContaining("auth.kcb.return-url");
+
+		property.setReturnUrl("https://example.com/kcb/return");
+		property.setTimeout(Duration.ZERO);
+		assertThatThrownBy(property::validate).hasMessageContaining("auth.kcb.timeout");
+	}
+
+	@Test
+	@DisplayName("시작 returnUrl - 다른 스킴·250 byte 초과(한글 포함)는 C400 으로 모듈 호출 전에 차단, 외부 http 는 허용")
+	void startReturnUrl() {
+		KcbAuthDto.StartRequest script = KcbAuthDto.StartRequest.builder().returnUrl("javascript:alert(1)").build();
+		// 100자라 @Size(250) 는 통과하지만 UTF-8 로 260 byte
+		KcbAuthDto.StartRequest tooLong = KcbAuthDto.StartRequest.builder().returnUrl("https://example.com/" + "가".repeat(80)).build();
+
+		assertThatThrownBy(() -> KcbAuthUtils.start(script))
+			.extracting(KcbAuthUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThatThrownBy(() -> KcbAuthUtils.start(tooLong))
+			.extracting(KcbAuthUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThat(OkCert.lastSvcName).isNull();
+
+		OkCert.nextResponse = "{\"RSLT_CD\":\"B000\",\"MDL_TKN\":\"tkn-1\"}";
+		KcbAuthUtils.start(KcbAuthDto.StartRequest.builder().returnUrl(" http://example.com/kcb/return ").build());
+		assertThat(OkCert.lastRequest).contains("\"RETURN_URL\":\"http://example.com/kcb/return\"");
 	}
 }

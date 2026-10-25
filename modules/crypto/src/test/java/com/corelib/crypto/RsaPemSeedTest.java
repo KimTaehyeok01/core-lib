@@ -65,6 +65,18 @@ class RsaPemSeedTest {
 	}
 
 	@Test
+	@DisplayName("RSA null 평문·암호문·서명 데이터 - NPE 500 이 아니라 CoreException 400")
+	void rsaNullInput() {
+		assertThatThrownBy(() -> RsaUtils.encrypt(null, keyPair.getPublic()))
+			.isInstanceOf(CoreException.class)
+			.extracting(e -> ((CoreException) e).getErrorCode()).isEqualTo(CryptoError.INVALID_ENCODING);
+		assertThatThrownBy(() -> RsaUtils.decrypt(null, keyPair.getPrivate()))
+			.extracting(e -> ((CoreException) e).getErrorCode()).isEqualTo(CryptoError.DECRYPT_FAILED);
+		assertThatThrownBy(() -> RsaUtils.sign(null, keyPair.getPrivate()))
+			.extracting(e -> ((CoreException) e).getErrorCode()).isEqualTo(CryptoError.INVALID_ENCODING);
+	}
+
+	@Test
 	@DisplayName("RSA 서명 — 맞으면 true, 데이터·서명이 한 글자라도 바뀌면 false")
 	void rsaSignature() {
 		byte[] signature = RsaUtils.sign(utf8("amount=10000"), keyPair.getPrivate());

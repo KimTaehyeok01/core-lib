@@ -19,6 +19,6 @@ public class NicePayInitialize {
 		WebClient client = WebClientUtils.builder(property.resolvedBaseUrl(), property.getConnectTimeout(), property.getReadTimeout())
 										 .defaultHeaders(headers -> headers.setBasicAuth(property.getClientKey(), property.getSecretKey()))
 										 .build();
-		NicePayUtils.initialize(client, property);
+		NicePayUtils.initialize(client, property, property.callTimeout());
 	}
 }

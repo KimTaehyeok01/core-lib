@@ -45,7 +45,8 @@ class NiceAuthUtilsTest {
 		property.setClientId(CLIENT_ID);
 		property.setClientSecret(CLIENT_SIGN);
 		property.setReturnUrl("https://example.com/nice/return");
-		NiceAuthUtils.initialize(WebClientUtils.builder(server.baseUrl(), Duration.ofSeconds(1), Duration.ofSeconds(1)).build(), property);
+		NiceAuthUtils.initialize(WebClientUtils.builder(server.baseUrl(), Duration.ofSeconds(1), Duration.ofSeconds(1)).build(), property,
+			property.callTimeout());
 	}
 
 	@AfterEach
@@ -238,6 +239,33 @@ class NiceAuthUtilsTest {
 				assertThat(errorCodeOf(e).code()).isEqualTo("NICE_1007");
 				assertThat(errorCodeOf(e).status()).isEqualTo(502);
 			});
+	}
+
+	@Test
+	@DisplayName("전체 상한 초과 - 읽기 timeout 전이어도 EXTERNAL_ERROR (연결·읽기+여유 5초)")
+	void verification_callTimeout_externalError() {
+		// 읽기 timeout(10초)보다 전체 상한(300ms)이 먼저 끊는다
+		NiceAuthProperty property = new NiceAuthProperty();
+		property.setClientId(CLIENT_ID);
+		property.setClientSecret(CLIENT_SIGN);
+		property.setReturnUrl("https://example.com/nice/return");
+		NiceAuthUtils.initialize(
+			WebClientUtils.builder(server.baseUrl(), Duration.ofSeconds(1), Duration.ofSeconds(10)).build(),
+			property, Duration.ofMillis(300));
+		server.enqueue(MockResponse.ok("{\"result_code\":\"0000\",\"access_token\":\"at-1\",\"expires_in\":1,\"ticket\":\"t\",\"iterators\":1}")
+			.delayed(Duration.ofSeconds(2)));
+
+		assertThatThrownBy(() -> NiceAuthUtils.verification(null))
+			.extracting(NiceAuthUtilsTest::errorCodeOf)
+			.isEqualTo(NiceAuthError.EXTERNAL_ERROR);
+	}
+
+	@Test
+	@DisplayName("전체 상한 - 연결 + 읽기 + 5초")
+	void property_callTimeout() {
+		NiceAuthProperty property = new NiceAuthProperty();
+
+		assertThat(property.callTimeout()).isEqualTo(Duration.ofSeconds(40));
 	}
 
 	@Test

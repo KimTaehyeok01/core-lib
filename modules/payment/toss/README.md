@@ -5,7 +5,7 @@
 
 ## 의존성
 ```groovy
-implementation 'com.corelib:payment-toss:0.1.0'   // 저장소 설정은 루트 README "설치"
+implementation 'com.corelib:payment-toss:0.2.0'   // 저장소 설정은 루트 README "설치"
 ```
 
 ## 설정
@@ -38,6 +38,8 @@ TossPayUtils.getPayment(paymentKey);   // 조회
 - 승인이 결과불명(timeout·5xx)이면 **조회 API 로 실제 상태를 재확인**한다 — 승인됐으면 결과를 돌려주고, 미성립이면 `TOSS-NOT-APPROVED`, 조회도 안 되면 `TOSS-UNKNOWN`.
 - 취소는 결과불명이어도 자동 재시도하지 않는다 (이중 취소 위험).
 - 토스 4xx 오류코드는 `TOSS_{code}` 로 그대로 넘긴다 (예: `TOSS_REJECT_CARD_COMPANY`).
+- 승인·취소 금액은 1 ~ 999,999,999 — 벗어나면 토스 호출 전에 `C400`.
+- 호출은 동기(`.block()`)이고 한 번에 최대 `connect-timeout + read-timeout + 5초` 걸린다 (읽기 timeout 이 read 마다 다시 걸려 끝나지 않는 응답을 막는 전체 상한, 초과는 결과불명). **`@Transactional`·DB 커넥션 점유 구간 밖에서 호출한다.**
 
 ## API 요약
 | 메서드 | 반환 |

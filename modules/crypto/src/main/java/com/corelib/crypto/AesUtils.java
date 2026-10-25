@@ -16,12 +16,15 @@ import javax.crypto.spec.SecretKeySpec;
  *   <li>새로 만드는 데이터는 GCM — 위변조를 태그로 검출한다. CBC 는 무결성이 없어 기존 연동(벤더 규격) 호환용으로만 쓴다</li>
  *   <li>같은 키로 IV 를 재사용하지 않는다 — {@link #encryptWithIv} 는 매번 새 IV 를 만들어 암호문 앞에 붙인다</li>
  *   <li>키는 16/24/32 byte(AES-128/192/256)만 받는다</li>
+ *   <li>GCM IV 는 12 byte 만 받는다 — 복호화만 벤더 규격 호환(NICE 인증 등)으로 16 byte 도 받는다</li>
  *   <li>복호화 실패 원인(태그 불일치/패딩 오류)은 구분해서 알리지 않는다 — 패딩 오라클 공격 방지</li>
  * </ul>
  */
 public final class AesUtils {
 
 	private static final int GCM_TAG_BITS = 128;
+	/** 벤더 규격 GCM IV 길이 — 받은 암호문 복호화에만 허용 */
+	private static final int GCM_VENDOR_IV_BYTES = 16;
 	private static final SecureRandom RANDOM = new SecureRandom();
 
 	private AesUtils() {
@@ -63,10 +66,14 @@ public final class AesUtils {
 	}
 
 	/**
+	 * @param iv GCM 12 byte · CBC 16 byte
 	 * @param aad GCM 추가 인증 데이터(암호화되지 않지만 위변조는 검출) — CBC 이거나 없으면 null
-	 * @throws CoreException INVALID_KEY / ENCRYPT_FAILED
+	 * @throws CoreException INVALID_KEY(키·IV 길이) / ENCRYPT_FAILED(null 평문 등)
 	 */
 	public static byte[] encrypt(byte[] plain, byte[] key, byte[] iv, Mode mode, byte[] aad) {
+		if (plain == null) {
+			throw new CoreException(CryptoError.ENCRYPT_FAILED, "AES 평문이 없습니다.");
+		}
 		try {
 			return cipher(Cipher.ENCRYPT_MODE, key, iv, mode, aad).doFinal(plain);
 		} catch (GeneralSecurityException e) {
@@ -75,9 +82,13 @@ public final class AesUtils {
 	}
 
 	/**
-	 * @throws CoreException INVALID_KEY / DECRYPT_FAILED(키 불일치·위변조·형식 오류 — 원인은 숨긴다)
+	 * @param iv GCM 12 byte(벤더 규격 호환 16 byte) · CBC 16 byte
+	 * @throws CoreException INVALID_KEY(키·IV 길이) / DECRYPT_FAILED(null·키 불일치·위변조·형식 오류 — 원인은 숨긴다)
 	 */
 	public static byte[] decrypt(byte[] cipherText, byte[] key, byte[] iv, Mode mode, byte[] aad) {
+		if (cipherText == null) {
+			throw new CoreException(CryptoError.DECRYPT_FAILED);
+		}
 		try {
 			return cipher(Cipher.DECRYPT_MODE, key, iv, mode, aad).doFinal(cipherText);
 		} catch (GeneralSecurityException e) {
@@ -95,8 +106,8 @@ public final class AesUtils {
 	/**
 	 * {@code IV || 암호문} 을 복호화한다.
 	 *
-	 * @param ivLength 앞에 붙은 IV 길이 — 벤더 규격이 기본값과 다를 때(예: GCM 16 byte) 지정
-	 * @throws CoreException DECRYPT_FAILED
+	 * @param ivLength 앞에 붙은 IV 길이 — GCM 은 12, 벤더 규격이 다를 때만 16 (NICE 인증 등)
+	 * @throws CoreException INVALID_KEY(키·IV 길이) / DECRYPT_FAILED
 	 */
 	public static byte[] decryptWithIv(byte[] ivAndCipherText, byte[] key, Mode mode, int ivLength) {
 		int minimum = ivLength + (mode == Mode.GCM ? GCM_TAG_BITS / 8 : 16);
@@ -115,6 +126,9 @@ public final class AesUtils {
 		if (iv == null || iv.length == 0) {
 			throw new CoreException(CryptoError.INVALID_KEY, "AES IV 가 없습니다.");
 		}
+		if (mode == Mode.GCM && !isAllowedGcmIv(operation, iv.length)) {
+			throw new CoreException(CryptoError.INVALID_KEY, "AES-GCM IV 는 12 byte 여야 합니다.");
+		}
 		Cipher cipher = Cipher.getInstance(mode.transformation);
 		SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
 		if (mode == Mode.GCM) {
@@ -126,6 +140,11 @@ public final class AesUtils {
 			cipher.init(operation, keySpec, new IvParameterSpec(iv));
 		}
 		return cipher;
+	}
+
+	/** 짧은 IV 는 같은 키에서 IV 가 겹쳐 GCM 이 깨진다 — 새로 암호화할 때는 12 byte 만 쓴다 */
+	private static boolean isAllowedGcmIv(int operation, int ivLength) {
+		return ivLength == Mode.GCM.ivLength || operation == Cipher.DECRYPT_MODE && ivLength == GCM_VENDOR_IV_BYTES;
 	}
 
 	private static void requireKeyLength(int keyBytes) {

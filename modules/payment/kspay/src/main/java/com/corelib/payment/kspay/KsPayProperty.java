@@ -20,6 +20,8 @@ public class KsPayProperty {
 	public static final String DEV_WEBFEP_BASE_URL = "https://paydev.ksnet.co.kr";
 	public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(5);
 	public static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(30);
+	/** 호출 전체 상한의 여유분 — 읽기 timeout 은 read 마다 다시 걸려 느린 응답이 이어지면 끝나지 않는다 */
+	static final Duration CALL_TIMEOUT_MARGIN = Duration.ofSeconds(5);
 
 	/** 상점아이디 — 승인 응답 storeid 와 대조한다 */
 	private String mid;
@@ -27,10 +29,10 @@ public class KsPayProperty {
 	/** webfep pgapi 키 (KSTA > PG상점정보 > 상점정보) — 리터럴 금지, {@code ${KSPAY_API_KEY}} 로만 주입. 로그 출력 금지 */
 	private String apiKey;
 
-	/** 통합모듈 승인 호스트 */
+	/** 통합모듈 승인 호스트 — 비우면 {@link #DEFAULT_APPROVAL_BASE_URL} */
 	private String approvalBaseUrl = DEFAULT_APPROVAL_BASE_URL;
 
-	/** webfep 취소 호스트 — 개발 서버는 {@link #DEV_WEBFEP_BASE_URL} */
+	/** webfep 취소 호스트 — 비우면 운영 {@link #DEFAULT_WEBFEP_BASE_URL}, 개발 서버는 {@link #DEV_WEBFEP_BASE_URL} */
 	private String webfepBaseUrl = DEFAULT_WEBFEP_BASE_URL;
 
 	private Duration connectTimeout = DEFAULT_CONNECT_TIMEOUT;
@@ -48,6 +50,21 @@ public class KsPayProperty {
 		}
 		requireHttps(this.approvalBaseUrl, "approval-base-url");
 		requireHttps(this.webfepBaseUrl, "webfep-base-url");
+	}
+
+	/** 비어 있으면 기본 승인 호스트 — 끝의 {@code /} 정리는 WebClientUtils 가 한다 */
+	public String resolvedApprovalBaseUrl() {
+		return StringUtils.isBlank(this.approvalBaseUrl) ? DEFAULT_APPROVAL_BASE_URL : this.approvalBaseUrl.trim();
+	}
+
+	/** 비어 있으면 운영 webfep 호스트 */
+	public String resolvedWebfepBaseUrl() {
+		return StringUtils.isBlank(this.webfepBaseUrl) ? DEFAULT_WEBFEP_BASE_URL : this.webfepBaseUrl.trim();
+	}
+
+	/** {@code .block()} 전체 상한 = 연결 + 읽기 + 여유 5초 */
+	Duration callTimeout() {
+		return this.connectTimeout.plus(this.readTimeout).plus(CALL_TIMEOUT_MARGIN);
 	}
 
 	private static void requireHttps(String url, String name) {

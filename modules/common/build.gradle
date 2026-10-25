@@ -20,5 +20,5 @@ dependencies {
     testImplementation 'jakarta.servlet:jakarta.servlet-api'
     testImplementation 'org.assertj:assertj-core'
     testImplementation 'org.springframework.data:spring-data-commons'
-    testRuntimeOnly 'ch.qos.logback:logback-classic'
+    testImplementation 'ch.qos.logback:logback-classic'    // 핸들러 로그(원인·제어문자 치환) 검증용 ListAppender
 }

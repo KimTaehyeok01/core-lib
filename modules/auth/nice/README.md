@@ -4,7 +4,7 @@ NICE 통합인증 본인확인 — 휴대폰·금융인증서·아이핀·공동
 
 ## 의존성
 ```groovy
-implementation 'com.corelib:auth-nice:0.1.0'   // 저장소 설정은 루트 README "설치"
+implementation 'com.corelib:auth-nice:0.2.0'   // 저장소 설정은 루트 README "설치"
 ```
 
 ## 설정
@@ -20,6 +20,7 @@ auth:
     tx-ttl: 10m                           # 시작~결과 유효시간 (최대 10분)
 ```
 - **테스트 환경이 없다** — NICE 와 계약 후 서버 출구 IP 를 등록하면 메일로 `client_id`/`client_secret` 을 받는다.
+- `client-id` 가 있는데 `client-secret`·`return-url` 이 비었거나, `base-url` 이 https 가 아니거나(로컬 http 만 허용), `tx-ttl` 이 0 이하·10분 초과면 **기동이 실패한다**. 메시지에는 키 이름만 나온다 (값 없음).
 
 ## 사용법
 ```java

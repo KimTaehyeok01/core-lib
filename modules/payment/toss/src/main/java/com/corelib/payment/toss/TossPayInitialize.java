@@ -19,6 +19,6 @@ public class TossPayInitialize {
 		WebClient client = WebClientUtils.builder(property.resolvedBaseUrl(), property.getConnectTimeout(), property.getReadTimeout())
 										 .defaultHeaders(headers -> headers.setBasicAuth(property.getSecretKey(), ""))
 										 .build();
-		TossPayUtils.initialize(client);
+		TossPayUtils.initialize(client, property.callTimeout());
 	}
 }

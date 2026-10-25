@@ -4,6 +4,7 @@ import com.corelib.lang.StringUtils;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -37,6 +38,7 @@ public class TossPayDto {
 		/** 기대 결제 금액 - 호출측이 보관한 값(successUrl 의 amount 아님). 응답 totalAmount 와 대조 */
 		@NotNull
 		@Positive(message = "결제 금액은 0보다 커야 합니다.")
+		@Max(999_999_999)
 		private Integer amount;
 	}
 
@@ -55,6 +57,7 @@ public class TossPayDto {
 
 		/** 부분취소 금액 (cancelAmount) - null 이면 전액취소 */
 		@Positive(message = "취소 금액은 0보다 커야 합니다.")
+		@Max(999_999_999)
 		private Integer cancelAmount;
 	}
 

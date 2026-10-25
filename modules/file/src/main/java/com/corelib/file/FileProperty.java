@@ -20,7 +20,7 @@ public class FileProperty {
 	/** 파일 1개 최대 크기 — 서블릿 multipart 한도(spring.servlet.multipart.max-file-size)와 맞춘다 */
 	private DataSize maxSize = DataSize.ofMegabytes(10);
 
-	/** 허용 확장자 — 비어 있으면 위험 확장자를 뺀 전부 허용 */
+	/** 허용 확장자 — 비어 있으면 위험 확장자를 뺀 전부 허용 (기동 안내에 경고, 업로드 용도에 맞게 지정 권장) */
 	private List<String> allowedExtensions = new ArrayList<>();
 
 	private final Local local = new Local();

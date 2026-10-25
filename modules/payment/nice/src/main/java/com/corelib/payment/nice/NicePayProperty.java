@@ -21,6 +21,8 @@ public class NicePayProperty {
 	public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(5);
 	/** 매뉴얼 권장 — 읽기 30초. 초과하면 승인 여부를 알 수 없어 망취소한다 */
 	public static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(30);
+	/** 호출 전체 상한의 여유분 — 읽기 timeout 은 read 마다 다시 걸려 느린 응답이 이어지면 끝나지 않는다 */
+	static final Duration CALL_TIMEOUT_MARGIN = Duration.ofSeconds(5);
 
 	/** 클라이언트 키 (운영 R1_/R2_, 샌드박스 S1_/S2_) */
 	private String clientKey;
@@ -54,5 +56,10 @@ public class NicePayProperty {
 	/** 비어 있으면 운영 호스트 — 끝의 {@code /} 정리는 WebClientUtils 가 한다 */
 	public String resolvedBaseUrl() {
 		return StringUtils.isBlank(this.baseUrl) ? DEFAULT_BASE_URL : this.baseUrl.trim();
+	}
+
+	/** {@code .block()} 전체 상한 = 연결 + 읽기 + 여유 5초 */
+	Duration callTimeout() {
+		return this.connectTimeout.plus(this.readTimeout).plus(CALL_TIMEOUT_MARGIN);
 	}
 }

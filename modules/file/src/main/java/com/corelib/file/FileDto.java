@@ -23,7 +23,7 @@ public class FileDto {
 		/** 바이트 크기 */
 		private final long size;
 
-		/** MIME 타입 (클라이언트 신고값이라 신뢰하지 않는다) */
+		/** 저장된 Content-Type — 확장자로 서버가 정한 값 (클라이언트 신고값은 쓰지 않는다, 모르는 확장자는 application/octet-stream) */
 		private final String contentType;
 
 		/** 접근 URL — S3 는 만료되는 presigned URL 이라 저장하지 말고 필요할 때 getUrl(key) 로 재발급한다 */

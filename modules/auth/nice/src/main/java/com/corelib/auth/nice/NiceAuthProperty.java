@@ -26,6 +26,8 @@ public class NiceAuthProperty {
 	public static final Duration MAX_TX_TTL = Duration.ofMinutes(10);
 	public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(5);
 	public static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(30);
+	/** 호출 전체 상한의 여유분 — 읽기 timeout 은 read 마다 다시 걸려 느린 응답이 이어지면 끝나지 않는다 */
+	static final Duration CALL_TIMEOUT_MARGIN = Duration.ofSeconds(5);
 
 	private String clientId;
 
@@ -80,5 +82,12 @@ public class NiceAuthProperty {
 	/** 비어 있으면 기본 호스트 — 끝의 {@code /} 정리는 WebClientUtils 가 한다 */
 	public String resolvedBaseUrl() {
 		return StringUtils.isBlank(this.baseUrl) ? DEFAULT_BASE_URL : this.baseUrl.trim();
+	}
+
+	/** {@code .block()} 전체 상한 = 연결 + 읽기 + 여유 5초 */
+	Duration callTimeout() {
+		Duration connect = this.connectTimeout == null ? DEFAULT_CONNECT_TIMEOUT : this.connectTimeout;
+		Duration read = this.readTimeout == null ? DEFAULT_READ_TIMEOUT : this.readTimeout;
+		return connect.plus(read).plus(CALL_TIMEOUT_MARGIN);
 	}
 }

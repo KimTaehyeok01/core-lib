@@ -11,7 +11,7 @@ spring:
 core:
   web:
     security:
-      # 헬스체크·Swagger·/error 는 기본 공개. 화면과 문의 접수만 더 연다 — 나머지(/api/admin/**)는 인증 필요
+      # 헬스체크·/error 는 기본 공개 (Swagger 문서는 public-docs: true 일 때만). 화면과 문의 접수만 더 연다 — 나머지(/api/admin/**)는 인증 필요
       permit-paths: [/, /index.html, /api/inquiries/**]
     request-log:
       include-body: true    # 예제라 본문까지 — 비밀번호·이메일·휴대폰 값은 마스킹된다 (운영은 false 권장)

@@ -5,7 +5,7 @@ public enum FailureType {
 	/** 4xx — 상대가 처리를 거절했다(결과확정). 본문의 벤더 오류코드를 확인한다 */
 	REJECTED,
 
-	/** 연결 실패(DNS·TCP·TLS·connect timeout) — 요청이 나가지 않았다(결과확정) */
+	/** 연결 실패(DNS·TCP·TLS·connect timeout·커넥션 풀 대기 초과) — 요청이 나가지 않았다(결과확정) */
 	NOT_SENT,
 
 	/** 읽기 timeout·5xx·본문 해석 실패 — 상대가 처리했는지 알 수 없다(결과불명). 조회·망취소로 확인한다 */

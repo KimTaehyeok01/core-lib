@@ -67,10 +67,13 @@ public final class RsaUtils {
 	}
 
 	/**
-	 * @throws CoreException INVALID_KEY(키 없음·종류 다름) / ENCRYPT_FAILED(데이터가 키 길이보다 김)
+	 * @throws CoreException INVALID_ENCODING(null 평문) / INVALID_KEY(키 없음·종류 다름) / ENCRYPT_FAILED(데이터가 키 길이보다 김)
 	 */
 	public static byte[] encrypt(byte[] plain, PublicKey publicKey, Padding padding) {
 		requireKey(publicKey);
+		if (plain == null) {
+			throw new CoreException(CryptoError.INVALID_ENCODING, "RSA 평문이 없습니다.");
+		}
 		try {
 			Cipher cipher = cipher(padding, Cipher.ENCRYPT_MODE, publicKey);
 			return cipher.doFinal(plain);
@@ -87,10 +90,13 @@ public final class RsaUtils {
 	}
 
 	/**
-	 * @throws CoreException INVALID_KEY / DECRYPT_FAILED(키·패딩 불일치, 위변조 — 원인은 구분하지 않는다)
+	 * @throws CoreException INVALID_KEY / DECRYPT_FAILED(null 암호문·키·패딩 불일치·위변조 — 원인은 구분하지 않는다)
 	 */
 	public static byte[] decrypt(byte[] cipherText, PrivateKey privateKey, Padding padding) {
 		requireKey(privateKey);
+		if (cipherText == null) {
+			throw new CoreException(CryptoError.DECRYPT_FAILED);
+		}
 		try {
 			Cipher cipher = cipher(padding, Cipher.DECRYPT_MODE, privateKey);
 			return cipher.doFinal(cipherText);
@@ -104,6 +110,9 @@ public final class RsaUtils {
 	/** SHA256withRSA 서명 */
 	public static byte[] sign(byte[] data, PrivateKey privateKey) {
 		requireKey(privateKey);
+		if (data == null) {
+			throw new CoreException(CryptoError.INVALID_ENCODING, "RSA 서명 대상이 없습니다.");
+		}
 		try {
 			Signature signature = Signature.getInstance(SIGNATURE);
 			signature.initSign(privateKey);

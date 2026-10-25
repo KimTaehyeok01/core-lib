@@ -27,6 +27,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.test.context.TestConstructor;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -63,6 +64,12 @@ class WebModuleIntegrationTest {
 		CoreSecurityCustomizer adminOnly() {
 			return http -> http.authorizeHttpRequests(authorize -> authorize.requestMatchers("/api/admin/**").hasRole("ADMIN"));
 		}
+
+		/** 테스트 인증 필터 — X-Test-Role 로 로그인, X-Test-Auth-Error 로 인증 실패 사유만 남김 */
+		@Bean
+		CoreSecurityCustomizer testAuthentication() {
+			return http -> http.addFilterBefore(new TestAuthenticationFilter(), AnonymousAuthenticationFilter.class);
+		}
 	}
 
 	@RestController
@@ -86,6 +93,12 @@ class WebModuleIntegrationTest {
 		@GetMapping("/api/public/denied")
 		ApiResponse<String> denied() {
 			throw new AccessDeniedException("권한 없음");
+		}
+
+		/** springdoc 대신 — 문서 경로가 열렸는지만 본다 */
+		@GetMapping("/v3/api-docs")
+		ApiResponse<String> apiDocs() {
+			return ApiResponse.success("docs");
 		}
 	}
 
@@ -121,11 +134,23 @@ class WebModuleIntegrationTest {
 
 		String log = output.getOut();
 		assertThat(log).containsPattern("\\[log-trace-0001\\].*POST /api/public/echo 200 \\d+ms ip=203\\.0\\.113\\.7");
-		assertThat(log).contains("\"password\":\"****\"").doesNotContain("p@ss", "secret-query", "GET /actuator/health");
+		assertThat(log).contains("\"password\":\"***\"").doesNotContain("p@ss", "secret-query", "GET /actuator/health");
 	}
 
 	@Test
-	@DisplayName("Security — 공개 경로 통과, 나머지 401 JSON, 권한 부족 403 JSON, 헬스체크는 공개")
+	@DisplayName("요청 로그 — body-max-length 를 넘은 본문은 경계에서 잘린 password 도 찍지 않고 크기만")
+	void requestLogTruncated(CapturedOutput output) throws Exception {
+		String json = "{\"filler\":\"" + "x".repeat(1965) + "\",\"password\":\"secret-password-123\"}";
+		mockMvc.perform(post("/api/public/echo").contentType(MediaType.APPLICATION_JSON).content(json))
+			   .andExpect(status().isOk())
+			   .andExpect(jsonPath("$.data.password").value("secret-password-123"));
+
+		assertThat(output.getOut()).contains("POST /api/public/echo 200", "req=(" + json.length() + " bytes) res=(")
+								   .doesNotContain("secret-pa");
+	}
+
+	@Test
+	@DisplayName("Security — 공개 경로 통과, 나머지 401 JSON, 권한 부족 403 JSON, 컨트롤러 AccessDenied 는 익명 401·로그인 403, 헬스체크만 공개")
 	void security() throws Exception {
 		mockMvc.perform(get("/api/public/whoami")).andExpect(status().isOk());
 		mockMvc.perform(get("/api/orders"))
@@ -135,7 +160,13 @@ class WebModuleIntegrationTest {
 		mockMvc.perform(get("/api/admin/users"))
 			   .andExpect(status().isUnauthorized())
 			   .andExpect(jsonPath("$.code").value("C401"));
+		mockMvc.perform(get("/api/admin/users").header(TestAuthenticationFilter.ROLE_HEADER, "USER"))
+			   .andExpect(status().isForbidden())
+			   .andExpect(jsonPath("$.code").value("C403"));
 		mockMvc.perform(get("/api/public/denied"))
+			   .andExpect(status().isUnauthorized())
+			   .andExpect(jsonPath("$.code").value("C401"));
+		mockMvc.perform(get("/api/public/denied").header(TestAuthenticationFilter.ROLE_HEADER, "USER"))
 			   .andExpect(status().isForbidden())
 			   .andExpect(jsonPath("$.code").value("C403"));
 		mockMvc.perform(get("/actuator/health"))
@@ -143,6 +174,34 @@ class WebModuleIntegrationTest {
 			   .andExpect(jsonPath("$.status").value("UP"))
 			   .andExpect(jsonPath("$.components").doesNotExist());
 		mockMvc.perform(get("/actuator/env")).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	@DisplayName("API 문서·actuator/info — public-docs 기본(false)이면 인증 필요")
+	void docsClosedByDefault() throws Exception {
+		mockMvc.perform(get("/v3/api-docs")).andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("C401"));
+		mockMvc.perform(get("/swagger-ui.html")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/swagger-ui/index.html")).andExpect(status().isUnauthorized());
+		mockMvc.perform(get("/actuator/info")).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	@DisplayName("인증 실패 사유 — 필터가 AUTH_ERROR_ATTRIBUTE 를 남기면 보호 경로는 그 코드로 401 + WWW-Authenticate, 공개 경로는 정상")
+	void authErrorAttribute() throws Exception {
+		mockMvc.perform(get("/api/orders").header(TestAuthenticationFilter.AUTH_ERROR_HEADER, "1"))
+			   .andExpect(status().isUnauthorized())
+			   .andExpect(header().string("WWW-Authenticate", "Bearer error=\"invalid_token\""))
+			   .andExpect(jsonPath("$.code").value("TEST-EXPIRED"))
+			   .andExpect(jsonPath("$.message").value("토큰이 만료되었습니다."));
+		mockMvc.perform(get("/api/public/denied").header(TestAuthenticationFilter.AUTH_ERROR_HEADER, "1"))
+			   .andExpect(status().isUnauthorized())
+			   .andExpect(jsonPath("$.code").value("TEST-EXPIRED"));
+		mockMvc.perform(get("/api/public/whoami").header(TestAuthenticationFilter.AUTH_ERROR_HEADER, "1"))
+			   .andExpect(status().isOk());
+		mockMvc.perform(get("/api/orders"))
+			   .andExpect(status().isUnauthorized())
+			   .andExpect(header().doesNotExist("WWW-Authenticate"))
+			   .andExpect(jsonPath("$.code").value("C401"));
 	}
 
 	@Test
@@ -163,6 +222,7 @@ class WebModuleIntegrationTest {
 															 .collect(java.util.stream.Collectors.toMap(StartupReport::getName, r -> r, (a, b) -> a));
 		assertThat(reports.get("Health").getPath()).isEqualTo("/actuator/health");
 		assertThat(reports.get("Web").getDetail()).contains("traceId 헤더=X-Request-Id", "본문 포함");
-		assertThat(reports.get("Security").getDetail()).contains("core 기본 체인", "인증 필요", "추가 공개 경로 1개", "https://admin.example.com");
+		assertThat(reports.get("Security").getDetail())
+			.contains("core 기본 체인", "인증 필요", "추가 공개 경로 1개", "API 문서 비공개", "https://admin.example.com");
 	}
 }

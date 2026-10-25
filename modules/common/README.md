@@ -5,7 +5,7 @@
 
 ## 의존성
 ```groovy
-implementation 'com.corelib:common:0.1.0'   // 저장소 설정은 루트 README "설치"
+implementation 'com.corelib:common:0.2.0'   // 저장소 설정은 루트 README "설치"
 implementation 'org.springframework.boot:spring-boot-starter-validation'   // ValidateUtils 를 쓸 때 (검증 구현체)
 ```
 
@@ -44,8 +44,8 @@ return ApiResponse.success(PageUtils.from(repository.findAll(PageUtils.pageable(
 ## 자동으로 켜지는 것
 | 기능 | 조건 | 내용 |
 |---|---|---|
-| 전역 예외 핸들러 `CoreExceptionHandler` | 서블릿 웹 앱 | `CoreException` → 담긴 코드·상태 / Spring MVC 요청 오류(깨진 JSON·파라미터 누락·타입 불일치·405·없는 경로) → C400·C404·C405 / 그 외 → 내부 메시지를 숨기고 C500 |
-| 기동 안내 `StartupLogPrinter` | `core.startup-log.enabled=true` | 앱이 뜨면 CORE 로고, Local·Network 주소, 붙인 모듈의 초기화 결과(`[core] TossPayUtils 미초기화 — ...`)를 한 번 찍는다 |
+| 전역 예외 핸들러 `CoreExceptionHandler` | 서블릿 웹 앱 | `CoreException` → 담긴 코드·상태 (4xx 는 detail 메시지, 5xx 는 ErrorCode 기본 메시지 + 원인 ERROR 로그) / Spring MVC 요청 오류(깨진 JSON·파라미터 누락·타입 불일치·깨진 multipart·405·없는 경로) → C400·C404·C405, 업로드 크기 초과 → C413 / 그 외 → 내부 메시지를 숨기고 C500 |
+| 기동 안내 `StartupLogPrinter` | `core.startup-log.enabled=true` | 앱이 뜨면 CORE 로고, Local·Network 주소, 붙인 모듈의 초기화 결과(`[core] TossPayUtils 미초기화 — ...`)를 한 번 찍는다. 모듈 안내가 예외를 던지면 그 모듈만 `미초기화 — 안내 생성 실패` 로 찍고 기동은 계속한다 |
 
 ## API 요약
 | 클래스 | 내용 |
@@ -54,7 +54,7 @@ return ApiResponse.success(PageUtils.from(repository.findAll(PageUtils.pageable(
 | `CoreException` | `(ErrorCode)` · `(ErrorCode, detail)` · `(ErrorCode, detail, cause)` · `addErrorLogData(key, value)` |
 | `ErrorCode` | `code()` · `message()` · `status()` · `ErrorCode.of(code, message, status)` |
 | `ValidateUtils` | `validate(target)` |
-| `PageResponse<T>` | `of(content, page, size, total)` · `slice(all, page, size)` · `map(mapper)` — page 는 0 부터 |
+| `PageResponse<T>` | `of(content, page, size, total)` · `slice(all, page, size)` (음수 page·1 미만 size 는 C400) · `map(mapper)` — page 는 0 부터, null 항목도 그대로 담는다 |
 | `PageUtils` | `from(Page)` · `pageable(page, size, sort)` (size 1~100 검증, C400) — spring-data-commons 가 있는 앱에서 |
 | `UrlUtils` | `isHttpsOrLoopback(url)` — 벤더 주소는 https, 로컬 테스트 서버만 http 허용 |
 | `StartupReporter` / `StartupReport` | 모듈이 기동 안내에 자기 상태를 알리는 확장 지점 — `ready` · `notReady` · `link` |
@@ -69,7 +69,8 @@ return ApiResponse.success(PageUtils.from(repository.findAll(PageUtils.pageable(
 | C500 | 500 | 서버 오류가 발생했습니다. |
 
 ## 주의
-- 예외 메시지(detail)는 그대로 응답에 나간다 — 개인정보·내부 정보는 `addErrorLogData` 로만.
+- 4xx 예외 메시지(detail)는 그대로 응답에 나간다 — 개인정보·내부 정보는 `addErrorLogData` 로만. 5xx(status ≥ 500)는 detail 대신 ErrorCode 기본 메시지로 응답하고 detail·원인 예외는 ERROR 로그에만 남긴다.
+- `addErrorLogData` 값은 로그에 찍을 때 제어문자(`\r` `\n` `\t` 등)를 `_` 로 바꾸고 값마다 200자에서 자른다 (로그 위조 방지).
 - 직접 `CoreExceptionHandler` 빈을 만들면 core 것은 물러난다.
 
 ## 예제

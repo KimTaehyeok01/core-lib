@@ -27,6 +27,18 @@ class LangUtilsTest {
 	}
 
 	@Test
+	@DisplayName("StringUtils.truncate - 이모지(서로게이트 쌍)를 반쪽으로 자르지 않음")
+	void truncateSurrogatePair() {
+		String text = "ab😀cd";    // 😀 = char 2개 (index 2·3)
+
+		assertThat(StringUtils.truncate(text, 3)).isEqualTo("ab");
+		assertThat(StringUtils.truncate(text, 4)).isEqualTo("ab😀");
+		assertThat(StringUtils.truncate("😀", 1)).isEmpty();
+		assertThat(StringUtils.truncate("😀😀", 3)).isEqualTo("😀");
+		assertThat(StringUtils.truncate("한글😀", 3)).isEqualTo("한글");
+	}
+
+	@Test
 	@DisplayName("CollectionUtils - null/빈 컬렉션·맵 판정, emptyIfNull")
 	void collectionUtils() {
 		assertThat(CollectionUtils.isEmpty((List<?>) null)).isTrue();

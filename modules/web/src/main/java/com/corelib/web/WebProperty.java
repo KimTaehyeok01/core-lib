@@ -61,14 +61,19 @@ public class WebProperty {
 		/** true 면 JSON 요청·응답 본문도 찍는다 (마스킹·길이 제한 적용) — 운영에서는 끄는 것을 권장 */
 		private boolean includeBody = false;
 
-		/** 본문 최대 길이 (넘으면 자른다) */
+		/** 본문 최대 바이트 — 넘는 본문은 내용 없이 크기만 찍는다 (잘린 값이 그대로 새지 않게) */
 		private int bodyMaxLength = 2000;
 
-		/** 본문에서 값을 가릴 JSON 키 — 키 이름이 이 단어로 끝나면 가린다 (대소문자 무시, userCi·newPassword 도 해당). name 은 goodsName 같은 키도 가린다 — 개인정보 노출보다 안전한 쪽 */
+		/**
+		 * 본문에서 값을 가릴 JSON 키 — 키 이름이 이 단어로 끝나면 값을 통째로 가린다 (대소문자 무시, userCi·newPassword·apiKey 도 해당, 값이 배열·객체여도).
+		 * name 은 goodsName, code 는 응답의 에러 code, key·tel 은 monkey·hotel 같은 키도 가린다 — 개인정보 노출보다 안전한 쪽
+		 */
 		private List<String> maskKeys = new ArrayList<>(List.of(
-			"password", "secret", "token", "authorization", "cardNo", "cardNumber", "cvc", "ci", "di",
-			"mobileNo", "phone", "telNo", "email", "residentNo", "rrn", "accountNo", "birth", "birthDt", "birthday", "birthDate",
-			"name", "address"));
+			"password", "passwd", "pwd", "pw", "secret", "token", "authorization", "key", "otp", "pin", "code",
+			"cardNo", "cardNumber", "cvc", "ci", "di",
+			"mobile", "mobileNo", "mobileNumber", "phone", "phoneNo", "phoneNumber", "tel", "telNo", "telNumber", "email",
+			"residentNo", "rrn", "accountNo", "birth", "birthDt", "birthday", "birthDate",
+			"name", "address", "uri", "url"));
 	}
 
 	/** core.web.security.* — spring-boot-starter-security 가 있을 때만 쓴다 */
@@ -82,8 +87,11 @@ public class WebProperty {
 		/** 아래 공개 경로 밖의 기본 접근 정책 */
 		private DefaultAccess defaultAccess = DefaultAccess.AUTHENTICATED;
 
-		/** 인증 없이 열어 둘 경로 (Ant 패턴) — 헬스체크·Swagger·/error 는 기본으로 열린다 */
+		/** 인증 없이 열어 둘 경로 (Ant 패턴) — 헬스체크(/actuator/health)·/error 는 기본으로 열린다 */
 		private List<String> permitPaths = new ArrayList<>();
+
+		/** true 면 Swagger UI·OpenAPI 문서(/swagger-ui/**, /v3/api-docs/**)를 인증 없이 연다 — 기본은 닫힘 (운영 API 명세 비공개) */
+		private boolean publicDocs = false;
 
 		/** CORS 허용 출처 (예: https://admin.my.domain) — 비우면 CORS 를 허용하지 않는다 */
 		private List<String> corsAllowedOrigins = new ArrayList<>();

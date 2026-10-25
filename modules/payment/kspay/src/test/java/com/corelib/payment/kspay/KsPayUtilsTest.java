@@ -2,6 +2,7 @@ package com.corelib.payment.kspay;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowableOfType;
 
 import com.corelib.common.error.CommonErrorCode;
 import com.corelib.common.error.ErrorCode;
@@ -27,6 +28,7 @@ class KsPayUtilsTest {
 	private static final Charset MS949 = Charset.forName("x-windows-949");
 	private static final String MID = "2999199999";
 	private static final String PC_PATH = "/store/KSPayWebV1.4/web_host/recv_post.jsp";
+	private static final Duration CALL_TIMEOUT = Duration.ofSeconds(10);
 
 	private MockHttpServer server;
 	private KsPayProperty property;
@@ -41,11 +43,15 @@ class KsPayUtilsTest {
 	}
 
 	private void init(String baseUrl) {
-		WebClient approval = WebClientUtils.builder(baseUrl, Duration.ofSeconds(1), Duration.ofMillis(500)).build();
-		WebClient webfep = WebClientUtils.builder(baseUrl, Duration.ofSeconds(1), Duration.ofMillis(500))
+		init(baseUrl, Duration.ofMillis(500), CALL_TIMEOUT);
+	}
+
+	private void init(String baseUrl, Duration readTimeout, Duration callTimeout) {
+		WebClient approval = WebClientUtils.builder(baseUrl, Duration.ofSeconds(1), readTimeout).build();
+		WebClient webfep = WebClientUtils.builder(baseUrl, Duration.ofSeconds(1), readTimeout)
 										 .defaultHeader(HttpHeaders.AUTHORIZATION, "pgapi " + property.getApiKey())
 										 .build();
-		KsPayUtils.initialize(property, approval, webfep);
+		KsPayUtils.initialize(property, approval, webfep, callTimeout);
 	}
 
 	@AfterEach
@@ -83,6 +89,11 @@ class KsPayUtilsTest {
 
 	private static ErrorCode errorCodeOf(Throwable e) {
 		return ((CoreException) e).getErrorCode();
+	}
+
+	private static KsPayDto.CancelRequest cardFullCancel() {
+		return KsPayDto.CancelRequest.builder()
+									 .payMethod(KsPayDto.PayMethod.CARD).tradeKeyType(KsPayDto.TradeKeyType.TID).tradeKey("T0000001").build();
 	}
 
 	// === 승인 ===
@@ -141,13 +152,36 @@ class KsPayUtilsTest {
 	}
 
 	@Test
-	@DisplayName("다른 상점아이디로 승인 - MID_MISMATCH")
+	@DisplayName("다른 상점아이디로 승인 - MID_MISMATCH, 우리 키로 취소할 수 없어 isCancelable false")
 	void approve_midMismatch() {
 		server.enqueue(approvalResponse(Map.of("storeid", "2999100000")));
 
 		assertThatThrownBy(() -> KsPayUtils.approve(request()))
-			.extracting(KsPayUtilsTest::errorCodeOf)
-			.isEqualTo(KsPayError.MID_MISMATCH);
+			.isInstanceOfSatisfying(KsPayMismatchException.class, e -> {
+				assertThat(e.getErrorCode()).isEqualTo(KsPayError.MID_MISMATCH);
+				assertThat(e.getTid()).isEqualTo("T0000001");
+				assertThat(e.isCancelable()).isFalse();
+			});
+	}
+
+	@Test
+	@DisplayName("승인 불일치 예외 - tid·payMethod 를 호출측이 읽어 바로 자동취소할 수 있다")
+	void approve_mismatch_exposesCancelKey() {
+		server.enqueue(approvalResponse(Map.of("amt", "9999")));
+		server.enqueue(MockResponse.ok("{\"code\":\"A0200\",\"data\":{\"respCode\":\"0000\",\"respMessage\":\"승인취소완료\"}}"));
+
+		KsPayMismatchException mismatch = catchThrowableOfType(KsPayMismatchException.class, () -> KsPayUtils.approve(request()));
+
+		assertThat(mismatch.getErrorCode()).isEqualTo(KsPayError.AMOUNT_MISMATCH);
+		assertThat(mismatch.getTid()).isEqualTo("T0000001");
+		assertThat(mismatch.getPayMethod()).isEqualTo(KsPayDto.PayMethod.CARD);
+		assertThat(mismatch.isCancelable()).isTrue();
+		assertThat(mismatch.getErrorLogData()).containsEntry("tid", "T0000001");
+
+		KsPayUtils.cancel(KsPayDto.CancelRequest.builder().payMethod(mismatch.getPayMethod())
+			.tradeKeyType(KsPayDto.TradeKeyType.TID).tradeKey(mismatch.getTid()).build());
+		assertThat(server.request(1).path()).isEqualTo("/kspay/webfep/api/v1/card/cancel");
+		assertThat(server.request(1).body()).contains("\"orgTradeKey\":\"T0000001\"");
 	}
 
 	@Test
@@ -295,6 +329,69 @@ class KsPayUtilsTest {
 	}
 
 	@Test
+	@DisplayName("취소 401 본문(A0401) - KSPAY_A0401, 설정 문제라 500")
+	void cancel_unauthorizedBody() {
+		server.enqueue(MockResponse.status(401, "{\"aid\":\"a-3\",\"code\":\"A0401\",\"message\":\"인증 실패\"}"));
+
+		assertThatThrownBy(() -> KsPayUtils.cancel(cardFullCancel()))
+			.hasMessage("인증 실패")
+			.satisfies(e -> {
+				assertThat(errorCodeOf(e).code()).isEqualTo("KSPAY_A0401");
+				assertThat(errorCodeOf(e).status()).isEqualTo(500);
+				assertThat(((CoreException) e).getErrorLogData()).containsEntry("httpStatus", 401).containsEntry("aid", "a-3");
+			});
+		assertThat(server.requestCount()).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("취소 400 본문(A0400) - KSPAY_A0400 400, '연결 불가' 로 뭉개지 않음")
+	void cancel_badRequestBody() {
+		server.enqueue(MockResponse.status(400, "{\"code\":\"A0400\",\"message\":\"필수 파라미터 누락\"}"));
+
+		assertThatThrownBy(() -> KsPayUtils.cancel(cardFullCancel()))
+			.hasMessage("필수 파라미터 누락")
+			.satisfies(e -> {
+				assertThat(errorCodeOf(e).code()).isEqualTo("KSPAY_A0400");
+				assertThat(errorCodeOf(e).status()).isEqualTo(400);
+			});
+	}
+
+	@Test
+	@DisplayName("취소 4xx 본문이 webfep 규격 아님 - EXTERNAL_ERROR, A0500 본문은 결과불명")
+	void cancel_clientError_unparsable() {
+		server.enqueue(MockResponse.bytes(403, "<html>Forbidden</html>".getBytes(MS949), "text/html"));
+		server.enqueue(MockResponse.status(400, "{\"code\":\"A0500\",\"message\":\"server error\"}"));
+
+		assertThatThrownBy(() -> KsPayUtils.cancel(cardFullCancel()))
+			.hasMessage("KSPAY 오류 응답입니다.")
+			.extracting(KsPayUtilsTest::errorCodeOf).isEqualTo(KsPayError.EXTERNAL_ERROR);
+		assertThatThrownBy(() -> KsPayUtils.cancel(cardFullCancel()))
+			.extracting(KsPayUtilsTest::errorCodeOf).isEqualTo(KsPayError.RESULT_UNKNOWN);
+	}
+
+	@Test
+	@DisplayName("취소 연결 거부 - 요청 미전송이라 EXTERNAL_ERROR '결제 서버에 연결할 수 없습니다'")
+	void cancel_connectionRefused() {
+		init(MockHttpServer.closedPortUrl());
+
+		assertThatThrownBy(() -> KsPayUtils.cancel(cardFullCancel()))
+			.hasMessage("결제 서버에 연결할 수 없습니다.")
+			.extracting(KsPayUtilsTest::errorCodeOf).isEqualTo(KsPayError.EXTERNAL_ERROR);
+	}
+
+	@Test
+	@DisplayName("취소 전체 상한 초과 - 읽기 timeout 전이어도 결과불명, 재시도 없음")
+	void cancel_callTimeout_unknown() {
+		// 읽기 timeout(10초)보다 전체 상한(300ms)이 먼저 끊는다
+		init(server.baseUrl(), Duration.ofSeconds(10), Duration.ofMillis(300));
+		server.enqueue(MockResponse.ok("{\"code\":\"A0200\",\"data\":{\"respCode\":\"0000\"}}").delayed(Duration.ofSeconds(2)));
+
+		assertThatThrownBy(() -> KsPayUtils.cancel(cardFullCancel()))
+			.extracting(KsPayUtilsTest::errorCodeOf).isEqualTo(KsPayError.RESULT_UNKNOWN);
+		assertThat(server.requestCount()).isEqualTo(1);
+	}
+
+	@Test
 	@DisplayName("A0500 서버 오류·통신 결과불명 - 재시도 없이 RESULT_UNKNOWN")
 	void cancel_unknown_noRetry() {
 		server.enqueue(MockResponse.ok("{\"code\":\"A0500\",\"message\":\"server error\"}"));
@@ -323,6 +420,18 @@ class KsPayUtilsTest {
 			.payMethod(KsPayDto.PayMethod.CARD).tradeKeyType(KsPayDto.TradeKeyType.TID).tradeKey("T1").cancelAmount(100).build()))
 			.extracting(KsPayUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.BAD_REQUEST);
 		assertThat(server.requestCount()).isZero();
+	}
+
+	@Test
+	@DisplayName("설정 - base-url 빈 값은 공식 기본 호스트, 전체 상한은 연결 + 읽기 + 5초")
+	void property_resolvedDefaults() {
+		KsPayProperty blank = new KsPayProperty();
+		blank.setApprovalBaseUrl("");
+		blank.setWebfepBaseUrl("  ");
+
+		assertThat(blank.resolvedApprovalBaseUrl()).isEqualTo(KsPayProperty.DEFAULT_APPROVAL_BASE_URL);
+		assertThat(blank.resolvedWebfepBaseUrl()).isEqualTo(KsPayProperty.DEFAULT_WEBFEP_BASE_URL);
+		assertThat(blank.callTimeout()).isEqualTo(Duration.ofSeconds(40));
 	}
 
 	@Test

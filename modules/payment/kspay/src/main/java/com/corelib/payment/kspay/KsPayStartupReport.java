@@ -28,7 +28,8 @@ public class KsPayStartupReport implements StartupReporter {
 		}
 		// 상점아이디는 결제창 form(sndStoreid)으로 브라우저에 나가는 공개값이라 그대로 찍는다
 		String cancel = StringUtils.isBlank(value.getApiKey()) ? "취소 불가(payment.kspay.api-key 미설정)" : "취소 가능";
-		return StartupReport.ready(NAME, "mid=" + value.getMid() + ", 승인=" + value.getApprovalBaseUrl()
-			+ ", 취소=" + value.getWebfepBaseUrl() + " " + cancel);
+		return StartupReport.ready(NAME, "mid=" + value.getMid() + ", 승인=" + value.resolvedApprovalBaseUrl()
+			+ ", 취소=" + value.resolvedWebfepBaseUrl() + " " + cancel + ", "
+			+ StartupReport.timeout(value.getConnectTimeout(), value.getReadTimeout()));
 	}
 }

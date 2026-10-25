@@ -10,6 +10,7 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.util.Locale;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -114,7 +115,8 @@ public final class OtpUtils {
 			int offset = hash[hash.length - 1] & 0x0F;
 			int binary = ((hash[offset] & 0x7F) << 24) | ((hash[offset + 1] & 0xFF) << 16)
 				| ((hash[offset + 2] & 0xFF) << 8) | (hash[offset + 3] & 0xFF);
-			return String.format("%0" + current.getDigits() + "d", binary % POW10[current.getDigits()]);
+			// 기본 로케일을 따르면 태국 숫자(th-TH-u-nu-thai) 등으로 찍혀 OTP 앱 코드와 달라진다.
+			return String.format(Locale.ROOT, "%0" + current.getDigits() + "d", binary % POW10[current.getDigits()]);
 		} catch (GeneralSecurityException e) {
 			throw new CoreException(CommonErrorCode.INTERNAL_SERVER, "OTP 계산에 실패했습니다.", e);
 		}
@@ -156,7 +158,8 @@ public final class OtpUtils {
 		if (StringUtils.isBlank(value)) {
 			throw new CoreException(CommonErrorCode.BAD_REQUEST, "OTP 비밀키가 비어 있습니다.");
 		}
-		String text = value.replace(" ", "").replace("=", "").toUpperCase();
+		// 터키어 로케일에서 i → İ 로 바뀌어 소문자 비밀키를 못 읽지 않게 Locale.ROOT 로 바꾼다.
+		String text = value.replace(" ", "").replace("=", "").toUpperCase(Locale.ROOT);
 		ByteBuffer out = ByteBuffer.allocate(text.length() * 5 / 8);
 		int buffer = 0;
 		int bits = 0;

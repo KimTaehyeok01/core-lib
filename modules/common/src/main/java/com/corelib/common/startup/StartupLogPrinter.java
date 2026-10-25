@@ -74,7 +74,7 @@ public class StartupLogPrinter implements ApplicationListener<ApplicationReadyEv
 			}
 		}
 
-		List<StartupReport> reports = reporters.stream().map(StartupReporter::report).toList();
+		List<StartupReport> reports = reporters.stream().map(StartupLogPrinter::reportOf).toList();
 		for (StartupReport report : reports) {
 			if (report.getPath() != null && base != null) {
 				line(out, report.getName(), base + report.getPath());
@@ -96,6 +96,29 @@ public class StartupLogPrinter implements ApplicationListener<ApplicationReadyEv
 			}
 		}
 		return out.append(LINE).toString();
+	}
+
+	/** 모듈 하나의 안내 실패가 앱 기동을 막지 않게 — 예외·null 은 미초기화로 바꿔 찍고 원인은 로그로 남긴다 */
+	private static StartupReport reportOf(StartupReporter reporter) {
+		String name = reporterName(reporter);
+		try {
+			StartupReport report = reporter.report();
+			if (report != null) {
+				return report;
+			}
+			log.warn("기동 안내 생성 실패 - reporter={}, report=null", name);
+		} catch (RuntimeException e) {
+			log.warn("기동 안내 생성 실패 - reporter={}", name, e);
+		}
+		return StartupReport.notReady(name, "안내 생성 실패");
+	}
+
+	/** 실패한 reporter 를 알아볼 이름 — 람다(@Bean 메서드)면 선언한 클래스 이름 */
+	private static String reporterName(StartupReporter reporter) {
+		Class<?> type = reporter.getClass();
+		String name = StringUtils.defaultIfBlank(type.getSimpleName(), type.getName());
+		int lambda = name.indexOf("$$");
+		return lambda > 0 ? name.substring(0, lambda) : name;
 	}
 
 	private static void line(StringBuilder out, String label, String value) {

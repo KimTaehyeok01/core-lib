@@ -52,18 +52,18 @@ public class MailDto {
 		@Builder.Default
 		private ContentType contentType = ContentType.TEXT;
 
-		/** 첨부파일 */
+		/** 첨부파일 — 목록 안의 null 항목은 400 */
 		@Builder.Default
-		private List<@Valid Attachment> attachments = List.of();
+		private List<@NotNull @Valid Attachment> attachments = List.of();
 
-		/** 수신자 1명에게 보내는 일반 텍스트 메일 */
+		/** 수신자 1명에게 보내는 일반 텍스트 메일 — to 가 null 이면 빈 목록으로 두어 @NotEmpty 로 400 */
 		public static SendRequest text(String to, String subject, String text) {
-			return SendRequest.builder().to(List.of(to)).subject(subject).content(text).build();
+			return SendRequest.builder().to(to == null ? List.of() : List.of(to)).subject(subject).content(text).build();
 		}
 
-		/** 수신자 1명에게 보내는 HTML 메일 */
+		/** 수신자 1명에게 보내는 HTML 메일 — to 가 null 이면 빈 목록으로 두어 @NotEmpty 로 400 */
 		public static SendRequest html(String to, String subject, String html) {
-			return SendRequest.builder().to(List.of(to)).subject(subject).content(html).contentType(ContentType.HTML).build();
+			return SendRequest.builder().to(to == null ? List.of() : List.of(to)).subject(subject).content(html).contentType(ContentType.HTML).build();
 		}
 	}
 

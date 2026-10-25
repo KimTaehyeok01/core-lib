@@ -86,7 +86,8 @@ final class ExifOrientation {
 			}
 		}
 		BufferedImage result = new BufferedImage(isSwapped ? height : width, isSwapped ? width : height,
-			image.getType() == BufferedImage.TYPE_CUSTOM ? BufferedImage.TYPE_INT_ARGB : image.getType());
+			image.getType() != BufferedImage.TYPE_CUSTOM ? image.getType()
+				: image.getColorModel().hasAlpha() ? BufferedImage.TYPE_INT_ARGB : BufferedImage.TYPE_INT_RGB);
 		Graphics2D graphics = result.createGraphics();
 		graphics.drawImage(image, transform, null);
 		graphics.dispose();

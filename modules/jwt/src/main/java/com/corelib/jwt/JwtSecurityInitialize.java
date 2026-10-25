@@ -1,7 +1,6 @@
 package com.corelib.jwt;
 
 import com.corelib.web.CoreSecurityCustomizer;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -24,7 +23,7 @@ public class JwtSecurityInitialize {
 	static final String CUSTOMIZER_BEAN = "coreJwtSecurityCustomizer";
 
 	@Bean(CUSTOMIZER_BEAN)
-	public CoreSecurityCustomizer coreJwtSecurityCustomizer(ObjectMapper objectMapper) {
-		return http -> http.addFilterBefore(new JwtAuthenticationFilter(objectMapper), UsernamePasswordAuthenticationFilter.class);
+	public CoreSecurityCustomizer coreJwtSecurityCustomizer() {
+		return http -> http.addFilterBefore(new JwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 	}
 }

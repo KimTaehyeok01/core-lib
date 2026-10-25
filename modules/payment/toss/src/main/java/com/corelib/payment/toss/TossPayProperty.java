@@ -18,6 +18,8 @@ public class TossPayProperty {
 	public static final String DEFAULT_BASE_URL = "https://api.tosspayments.com";
 	public static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(5);
 	public static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(30);
+	/** 호출 전체 상한의 여유분 — 읽기 timeout 은 read 마다 다시 걸려 느린 응답이 이어지면 끝나지 않는다 */
+	static final Duration CALL_TIMEOUT_MARGIN = Duration.ofSeconds(5);
 
 	/** 시크릿 키 — 리터럴 금지, {@code ${TOSS_SECRET_KEY}} 로만 주입한다. 로그 출력 금지 */
 	private String secretKey;
@@ -50,5 +52,10 @@ public class TossPayProperty {
 	/** 비어 있으면 기본 호스트 — 끝의 {@code /} 정리는 WebClientUtils 가 한다 */
 	public String resolvedBaseUrl() {
 		return StringUtils.isBlank(this.baseUrl) ? DEFAULT_BASE_URL : this.baseUrl.trim();
+	}
+
+	/** {@code .block()} 전체 상한 = 연결 + 읽기 + 여유 5초 */
+	Duration callTimeout() {
+		return this.connectTimeout.plus(this.readTimeout).plus(CALL_TIMEOUT_MARGIN);
 	}
 }

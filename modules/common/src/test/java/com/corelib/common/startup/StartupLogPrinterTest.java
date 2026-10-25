@@ -1,11 +1,15 @@
 package com.corelib.common.startup;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 
+import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.mock.env.MockEnvironment;
 
@@ -41,6 +45,35 @@ class StartupLogPrinterTest {
 
 		assertThat(out).contains("application 실행 완료 (profile: default)", "[core] MailUtils 초기화 완료")
 					   .doesNotContain("Local", "Network");
+	}
+
+	@Test
+	@DisplayName("reporter 가 예외·null 을 내도 그 모듈만 미초기화(안내 생성 실패), 나머지는 그대로")
+	void reporterFailure() {
+		StartupReporter broken = () -> {
+			throw new IllegalStateException("property 누락");
+		};
+		String out = new StartupLogPrinter(List.of(broken, () -> null, () -> StartupReport.ready("MailUtils", null)))
+			.render(new MockEnvironment(), null, null);
+
+		assertThat(out).contains("[core] StartupLogPrinterTest 미초기화 — 안내 생성 실패", "[core] MailUtils");
+		assertThat(out.split("안내 생성 실패", -1)).hasSize(3);
+	}
+
+	@Test
+	@DisplayName("ApplicationReadyEvent 처리 중 reporter 예외가 밖으로 나가지 않음 — 기동 유지")
+	void reporterFailureKeepsStartup() {
+		new ApplicationContextRunner()
+			.withConfiguration(AutoConfigurations.of(StartupLogAutoConfiguration.class))
+			.withBean(StartupReporter.class, () -> () -> {
+				throw new IllegalStateException("property 누락");
+			})
+			.run(context -> {
+				assertThat(context).hasNotFailed();
+				ApplicationReadyEvent ready = new ApplicationReadyEvent(new SpringApplication(), new String[0],
+					context.getSourceApplicationContext(), Duration.ZERO);
+				assertThatNoException().isThrownBy(() -> context.publishEvent(ready));
+			});
 	}
 
 	@Test

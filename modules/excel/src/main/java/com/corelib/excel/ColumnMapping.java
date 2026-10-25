@@ -21,6 +21,8 @@ final class ColumnMapping {
 
 	private static final Set<String> TRUE_TEXTS = Set.of("y", "yes", "true", "1", "예", "o");
 	private static final Set<String> FALSE_TEXTS = Set.of("n", "no", "false", "0", "아니오", "x");
+	/** BigDecimal 유효 자릿수·소수 자릿수 상한 — 1E999999999 같은 값은 toPlainString·연산에서 메모리가 폭증한다 */
+	static final int MAX_DECIMAL_DIGITS = 38;
 
 	private ColumnMapping() {
 	}
@@ -136,7 +138,7 @@ final class ColumnMapping {
 				return Double.valueOf(number(value));
 			}
 			if (type == BigDecimal.class) {
-				return new BigDecimal(number(value));
+				return decimal(new BigDecimal(number(value)));
 			}
 		} catch (NumberFormatException e) {
 			throw new IllegalArgumentException("숫자 형식이 아닙니다.");
@@ -178,6 +180,13 @@ final class ColumnMapping {
 	/** 1,234 → 1234 (천 단위 쉼표 허용) */
 	private static String number(String value) {
 		return value.replace(",", "");
+	}
+
+	private static BigDecimal decimal(BigDecimal value) {
+		if (value.precision() > MAX_DECIMAL_DIGITS || value.scale() > MAX_DECIMAL_DIGITS || value.scale() < -MAX_DECIMAL_DIGITS) {
+			throw new IllegalArgumentException("숫자 범위를 벗어났습니다.");
+		}
+		return value;
 	}
 
 	private static DateTimeFormatter formatter(ExcelColumn annotation, DateTimeFormatter fallback) {

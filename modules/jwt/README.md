@@ -5,11 +5,12 @@ JWT(JWS) 토큰 발급·검증 — RS256(기본)·HS256, 액세스/리프레시 
 
 ## 의존성
 ```groovy
-implementation 'com.corelib:jwt:0.1.0'   // 저장소 설정은 루트 README "설치"
-implementation 'com.corelib:web:0.1.0'                                   // Bearer 필터를 쓸 때
+implementation 'com.corelib:jwt:0.2.0'   // 저장소 설정은 루트 README "설치"
+implementation 'com.corelib:web:0.2.0'                                   // Bearer 필터를 쓸 때
 implementation 'org.springframework.boot:spring-boot-starter-security'   // Bearer 필터를 쓸 때
 ```
-`nimbus-jose-jwt` 10.10 이 함께 들어온다.
+`nimbus-jose-jwt` 10.10 과 `crypto` 는 런타임에만 함께 들어온다 (공개 API 에 그 타입이 없어 `implementation` — 소비 앱 컴파일 classpath 에는 보이지 않는다).
+`PemUtils`·`RsaUtils` 등을 앱 코드에서 직접 쓰려면 `com.corelib:crypto` 를 따로 선언한다.
 
 ## 설정
 ```yaml
@@ -28,7 +29,8 @@ core:
     security:
       enabled: true                   # Bearer 필터 연동 (web + security 가 있을 때)
 ```
-키 셋 중 하나도 없으면 자동설정이 꺼진다 (호출 시 "미초기화", 기동 안내에 표시).
+키 셋 중 하나도 없으면(빈 값·공백 포함) 자동설정이 꺼진다 (호출 시 "미초기화", 기동 안내에 표시).
+켜짐 판단은 키 값이 있는지만 본다 — 값에 `'` 같은 특수문자가 있어도 되고, 값은 조건 평가 로그(`--debug`)에 찍히지 않는다.
 
 RS256 키 만들기:
 ```bash
@@ -58,13 +60,21 @@ public Map<String, Object> jwks() { return JwtUtils.jwks(); }
 ```
 
 ## Bearer 필터 동작
-| 요청 | 결과 |
-|---|---|
-| `Authorization` 헤더 없음 | 그냥 통과 — 공개 경로는 그대로, 인증 경로는 core 체인이 401 `C401` |
-| 유효한 액세스 토큰 | 로그인 상태. `roles` 가 `ROLE_` 권한이 된다 (`ADMIN` → `hasRole("ADMIN")`) |
-| 만료 | 401 `JWT-EXPIRED` + `WWW-Authenticate: Bearer error="invalid_token"` — 클라이언트는 갱신 |
-| 위조·형식 오류·다른 발급자 | 401 `JWT-INVALID` — 다시 로그인 |
-| 리프레시 토큰을 넣음 | 401 `JWT-TYPE` |
+필터는 토큰이 잘못돼도 직접 응답하지 않는다. 실패 사유(ErrorCode)를 request attribute `WebSecurityInitialize.AUTH_ERROR_ATTRIBUTE` 에 남기고 인증 없이 통과시킨다.
+응답은 경로에 따라 core 보안 체인이 정한다.
+
+| 요청 | 공개 경로 (`core.web.security.permit-paths`) | 인증이 필요한 경로 |
+|---|---|---|
+| `Authorization` 헤더 없음 | 그대로 처리 | 401 `C401` |
+| 유효한 액세스 토큰 | 로그인 상태로 처리 | 로그인 상태. `roles` 가 `ROLE_` 권한이 된다 (`ADMIN` → `hasRole("ADMIN")`) |
+| 만료 | **토큰을 무시하고 처리** (예: 만료 토큰을 단 채 `/api/auth/refresh`) | 401 `JWT-EXPIRED` + `WWW-Authenticate: Bearer error="invalid_token"` — 클라이언트는 갱신 |
+| 위조·형식 오류·다른 발급자 | 토큰을 무시하고 처리 | 401 `JWT-INVALID` + `WWW-Authenticate` — 다시 로그인 |
+| 리프레시 토큰을 넣음 | 토큰을 무시하고 처리 | 401 `JWT-TYPE` + `WWW-Authenticate` |
+
+- `@PreAuthorize` 거부: 로그인하지 않은 요청은 401 (토큰 오류가 있었으면 그 코드 `JWT-EXPIRED` 등 + `WWW-Authenticate`), 로그인 사용자의 권한 부족은 403 `C403` — web 모듈 `SecurityExceptionHandler`.
+- **0.2.0 동작 변경**: 0.1.0 은 공개 경로에서도 잘못된 토큰이면 필터가 바로 401 을 냈다. 이제 공개 경로에서는 무시한다.
+- 앱이 `SecurityFilterChain` 을 직접 만들면 필터는 자동으로 붙지 않는다. 직접 `new JwtAuthenticationFilter()` 를 붙인다면, 진입점(`AuthenticationEntryPoint`)이 위 attribute 를 읽어 401 을 응답해야 한다.
+- 기동 안내의 `Bearer 필터 연동` 은 core 보안 체인이 있을 때만 나온다. 체인이 없으면 `Bearer 필터 없음 (core 보안 체인 미사용)`.
 
 ## API 요약
 | 메서드 | 내용 |
@@ -87,6 +97,7 @@ public Map<String, Object> jwks() { return JwtUtils.jwks(); }
 - **무상태** — core 는 토큰을 저장하지 않는다. 로그아웃·리프레시 회전·탈취 감지는 호출측이 jti 를 저장해서 한다 (예제 참고).
 - 액세스 토큰은 로그아웃해도 만료까지 유효하다 — 짧게(기본 30분) 둔다.
 - 검증 때 토큰 헤더의 `alg` 가 설정과 같아야 한다 — `alg:none`, 공개키를 HMAC 비밀값으로 쓰는 바꿔치기 공격을 막는다.
+  서명 확인 전의 `alg` 원문은 로그에 남기지 않는다 (로그 위조 방지, 설정 알고리즘 `expectedAlg` 만 남긴다).
 - 예약 claim(`iss`·`sub`·`exp`·`roles`·`token_type` 등)은 `extraClaims` 로 덮어쓸 수 없다.
 
 ## 예제

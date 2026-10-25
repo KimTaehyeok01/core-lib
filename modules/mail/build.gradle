@@ -6,4 +6,5 @@ dependencies {
     api 'org.springframework.boot:spring-boot-starter-validation:3.5.16'    // 요청 DTO 검증(ValidateUtils) 구현체
 
     testImplementation 'org.assertj:assertj-core'
+    testImplementation 'org.springframework.boot:spring-boot-test'    // 자동설정·기동 안내 검증 (ApplicationContextRunner)
 }

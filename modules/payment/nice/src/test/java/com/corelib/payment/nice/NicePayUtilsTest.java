@@ -24,16 +24,22 @@ class NicePayUtilsTest {
 	private static final String SIGN_KEY = "sk-test";
 	private static final String TID = "tid_1";
 	private static final String EDI_DATE = "2026-10-18T10:00:00.000+0900";
+	private static final Duration CALL_TIMEOUT = Duration.ofSeconds(10);
 
 	private MockHttpServer server;
 
 	@BeforeEach
 	void setUp() {
 		server = MockHttpServer.start();
+		NicePayUtils.initialize(WebClientUtils.builder(server.baseUrl(), Duration.ofSeconds(1), Duration.ofMillis(500)).build(),
+			property(), CALL_TIMEOUT);
+	}
+
+	private static NicePayProperty property() {
 		NicePayProperty property = new NicePayProperty();
 		property.setClientKey(CLIENT_KEY);
 		property.setSecretKey(SIGN_KEY);
-		NicePayUtils.initialize(WebClientUtils.builder(server.baseUrl(), Duration.ofSeconds(1), Duration.ofMillis(500)).build(), property);
+		return property;
 	}
 
 	@AfterEach
@@ -91,6 +97,25 @@ class NicePayUtilsTest {
 			.hasMessage("사용자 취소")
 			.extracting(e -> errorCodeOf(e).code())
 			.isEqualTo("NICEPAY_9100");
+	}
+
+	@Test
+	@DisplayName("인증 실패 코드·메시지 변조 - 개행·긴 코드는 AUTH_FAILED 로 고정, 메시지는 제어문자 제거 + 100자 제한")
+	void verifyAuthResult_tamperedFailure() {
+		NicePayDto.AuthResult newline = authResult("91\r\nX", 10000, "x");
+		newline.setAuthResultMsg("사용자\r\n취소\u202E" + "가".repeat(200));
+		NicePayDto.AuthResult tooLong = authResult("ABCDEFGH1", 10000, "x");
+		tooLong.setAuthResultMsg("\n\t");
+
+		assertThatThrownBy(() -> NicePayUtils.verifyAuthResult(newline, "order-1", 10000))
+			.satisfies(e -> {
+				assertThat(errorCodeOf(e).code()).isEqualTo("NICEPAY_AUTH_FAILED");
+				assertThat(e.getMessage()).startsWith("사용자취소가").hasSize(100).doesNotContain("\r", "\n", "\u202E");
+			});
+		assertThatThrownBy(() -> NicePayUtils.verifyAuthResult(tooLong, "order-1", 10000))
+			.hasMessage("결제 인증에 실패했습니다.")
+			.extracting(e -> errorCodeOf(e).code())
+			.isEqualTo("NICEPAY_AUTH_FAILED");
 	}
 
 	@Test
@@ -161,6 +186,28 @@ class NicePayUtilsTest {
 	}
 
 	@Test
+	@DisplayName("승인 응답 paid 인데 서명 없음 - SIGNATURE_MISMATCH (검증 생략 안 함)")
+	void approve_paidWithoutSignature() throws Exception {
+		String unsigned = payment("0000", "paid", 10000, "card").replaceFirst("\"signature\":\"[0-9a-f]+\",", "");
+		server.enqueue(MockResponse.ok(unsigned));
+
+		assertThatThrownBy(() -> NicePayUtils.approve(approveRequest()))
+			.extracting(NicePayUtilsTest::errorCodeOf)
+			.isEqualTo(NicePayError.SIGNATURE_MISMATCH);
+	}
+
+	@Test
+	@DisplayName("승인 응답 가상계좌 발급(ready) 인데 서명 없음 - SIGNATURE_MISMATCH")
+	void approve_vbankWithoutSignature() throws Exception {
+		String unsigned = payment("0000", "ready", 10000, "vbank").replaceFirst("\"signature\":\"[0-9a-f]+\",", "");
+		server.enqueue(MockResponse.ok(unsigned));
+
+		assertThatThrownBy(() -> NicePayUtils.approve(approveRequest()))
+			.extracting(NicePayUtilsTest::errorCodeOf)
+			.isEqualTo(NicePayError.SIGNATURE_MISMATCH);
+	}
+
+	@Test
 	@DisplayName("승인 거절(200 + 실패 코드) - NICEPAY_{resultCode}, 메시지는 원문, 망취소 안 함")
 	void approve_rejected() {
 		server.enqueue(MockResponse.ok("{\"resultCode\":\"3011\",\"resultMsg\":\"카드 한도 초과\",\"tid\":\"" + TID + "\"}"));
@@ -186,6 +233,21 @@ class NicePayUtilsTest {
 	}
 
 	@Test
+	@DisplayName("전체 상한 초과 → 읽기 timeout 전이어도 결과불명으로 보고 망취소 - NET_CANCELLED")
+	void approve_callTimeout_netCancelled() throws Exception {
+		// 읽기 timeout(10초)보다 전체 상한(300ms)이 먼저 끊는다
+		NicePayUtils.initialize(WebClientUtils.builder(server.baseUrl(), Duration.ofSeconds(1), Duration.ofSeconds(10)).build(),
+			property(), Duration.ofMillis(300));
+		server.enqueue(MockResponse.ok(payment("0000", "paid", 10000, "card")).delayed(Duration.ofSeconds(2)));
+		server.enqueue(MockResponse.ok(payment("0000", "cancelled", 10000, "card")));
+
+		assertThatThrownBy(() -> NicePayUtils.approve(approveRequest()))
+			.extracting(NicePayUtilsTest::errorCodeOf)
+			.isEqualTo(NicePayError.NET_CANCELLED);
+		assertThat(server.request(1).path()).isEqualTo("/v1/payments/netcancel");
+	}
+
+	@Test
 	@DisplayName("승인 5xx → 망취소도 실패 - RESULT_UNKNOWN (관리자 확인)")
 	void approve_serverError_netCancelFails() {
 		server.enqueue(MockResponse.status(500, "{}"));
@@ -200,10 +262,8 @@ class NicePayUtilsTest {
 	@Test
 	@DisplayName("승인 연결 거부 - 요청 미전송이라 EXTERNAL_ERROR, 망취소 안 함")
 	void approve_connectionRefused() {
-		NicePayProperty property = new NicePayProperty();
-		property.setClientKey(CLIENT_KEY);
-		property.setSecretKey(SIGN_KEY);
-		NicePayUtils.initialize(WebClientUtils.builder(MockHttpServer.closedPortUrl(), Duration.ofSeconds(1), Duration.ofSeconds(1)).build(), property);
+		NicePayUtils.initialize(WebClientUtils.builder(MockHttpServer.closedPortUrl(), Duration.ofSeconds(1), Duration.ofSeconds(1)).build(),
+			property(), CALL_TIMEOUT);
 
 		assertThatThrownBy(() -> NicePayUtils.approve(approveRequest()))
 			.extracting(NicePayUtilsTest::errorCodeOf)
@@ -218,6 +278,22 @@ class NicePayUtilsTest {
 		assertThatThrownBy(() -> NicePayUtils.approve(invalid))
 			.extracting(NicePayUtilsTest::errorCodeOf)
 			.isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThat(server.requestCount()).isZero();
+	}
+
+	@Test
+	@DisplayName("금액 상한 - 승인·취소·면세 금액이 999,999,999 를 넘으면 BAD_REQUEST (NICEPAY 호출 전 차단)")
+	void amount_upperBound() {
+		NicePayDto.ApproveRequest tooLarge = NicePayDto.ApproveRequest.builder().tid(TID).orderId("order-1").amount(1_000_000_000).build();
+
+		assertThatThrownBy(() -> NicePayUtils.approve(tooLarge))
+			.extracting(NicePayUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThatThrownBy(() -> NicePayUtils.cancel(TID,
+			NicePayDto.CancelRequest.builder().reason("고객 변심").orderId("order-1").cancelAmt(1_000_000_000).build()))
+			.extracting(NicePayUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThatThrownBy(() -> NicePayUtils.cancel(TID,
+			NicePayDto.CancelRequest.builder().reason("고객 변심").orderId("order-1").cancelAmt(1000).taxFreeAmt(1_000_000_000).build()))
+			.extracting(NicePayUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.BAD_REQUEST);
 		assertThat(server.requestCount()).isZero();
 	}
 
@@ -261,6 +337,12 @@ class NicePayUtilsTest {
 			.extracting(e -> errorCodeOf(e).code())
 			.isEqualTo("NICEPAY_2152");
 		assertThat(server.request(0).method()).isEqualTo("GET");
+	}
+
+	@Test
+	@DisplayName("전체 상한 - 연결 + 읽기 + 5초")
+	void property_callTimeout() {
+		assertThat(new NicePayProperty().callTimeout()).isEqualTo(Duration.ofSeconds(40));
 	}
 
 	@Test

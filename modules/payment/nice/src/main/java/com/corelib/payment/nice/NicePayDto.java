@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -73,6 +74,7 @@ public class NicePayDto {
 		/** 기대 결제 금액 — 호출측이 보관한 값 */
 		@NotNull
 		@Positive(message = "결제 금액은 0보다 커야 합니다.")
+		@Max(999_999_999)
 		private Integer amount;
 	}
 
@@ -96,10 +98,12 @@ public class NicePayDto {
 
 		/** 취소 금액 — null 이면 전액취소 (샌드박스는 부분취소 불가) */
 		@Positive(message = "취소 금액은 0보다 커야 합니다.")
+		@Max(999_999_999)
 		private Integer cancelAmt;
 
 		/** 취소 금액 중 면세 금액 */
 		@PositiveOrZero
+		@Max(999_999_999)
 		private Integer taxFreeAmt;
 
 		/** 환불 계좌번호 — 가상계좌 환불 시 */

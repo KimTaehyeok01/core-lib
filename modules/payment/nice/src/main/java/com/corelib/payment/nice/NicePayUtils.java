@@ -8,10 +8,12 @@ import com.corelib.lang.StringUtils;
 import com.corelib.webclient.FailureType;
 import com.corelib.webclient.WebClientUtils;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -29,6 +31,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *   <li>승인 결과불명(읽기 timeout·5xx)이면 매뉴얼 지침대로 즉시 망취소한다 — 망취소는 승인 요청 후 1시간 안에만 된다</li>
  *   <li>취소는 결과불명이어도 자동 재시도하지 않는다 — 이중취소 위험</li>
  *   <li>NICEPAY 결과코드는 {@code NICEPAY_{resultCode}} 로 그대로 넘긴다</li>
+ *   <li>동기 호출이라 한 번에 최대 connect-timeout + read-timeout + 5초(승인 결과불명이면 망취소까지 2배) 스레드를 붙잡는다 —
+ *       {@code @Transactional}·DB 커넥션 점유 구간 밖에서 호출한다</li>
  * </ul>
  */
 @Slf4j
@@ -39,16 +43,25 @@ public final class NicePayUtils {
 	private static final Consumer<HttpHeaders> JSON_UTF8 =
 		headers -> headers.setContentType(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8));
 
-	private static WebClient webClient;
-	private static NicePayProperty nicePayProperty;
+	/** 브라우저가 보낸 authResultCode 중 에러코드로 쓸 수 있는 형식 — 그 외는 AUTH_FAILED 로 고정 */
+	private static final Pattern AUTH_RESULT_CODE = Pattern.compile("[A-Za-z0-9]{1,8}");
+	/** 제어·서식·줄 구분 문자 — 로그·화면 위조에 쓰여 브라우저 메시지에서 지운다 */
+	private static final Pattern UNSAFE_CHARS = Pattern.compile("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]");
+	private static final int MAX_AUTH_RESULT_MSG_LENGTH = 100;
+
+	/** 클라이언트·설정·전체 상한을 한 번에 바꾼다 — 호출 중인 스레드가 섞인 조합을 보지 않게 */
+	private static volatile Config config;
 
 	private NicePayUtils() {
 	}
 
-	/** 기동 시 {@link NicePayInitialize} 가 1회 호출한다 — 소비자가 직접 부르지 않는다 */
-	static void initialize(WebClient initializeWebClient, NicePayProperty initializeNicePayProperty) {
-		webClient = initializeWebClient;
-		nicePayProperty = initializeNicePayProperty;
+	/**
+	 * 기동 시 {@link NicePayInitialize} 가 1회 호출한다 — 소비자가 직접 부르지 않는다.
+	 *
+	 * @param callTimeout {@code .block()} 전체 상한 — 초과는 읽기 timeout 과 같은 결과불명
+	 */
+	static void initialize(WebClient initializeWebClient, NicePayProperty initializeNicePayProperty, Duration callTimeout) {
+		config = new Config(initializeWebClient, initializeNicePayProperty, callTimeout);
 	}
 
 	/**
@@ -61,15 +74,17 @@ public final class NicePayUtils {
 	 *                       AUTH_MISMATCH(클라이언트키·주문번호·금액 불일치) / SIGNATURE_MISMATCH(위변조)
 	 */
 	public static String verifyAuthResult(NicePayDto.AuthResult authResult, String expectedOrderId, Integer expectedAmount) {
-		NicePayProperty property = property();
+		NicePayProperty property = config().property();
 		if (authResult == null) {
 			throw new CoreException(CommonErrorCode.BAD_REQUEST, "결제 인증 결과가 없습니다.");
 		}
 		final Map<String, Object> logData = Map.of("orderId", String.valueOf(authResult.getOrderId()));
 
 		if (!SUCCESS_CODE.equals(authResult.getAuthResultCode())) {
-			String message = StringUtils.defaultIfBlank(authResult.getAuthResultMsg(), "결제 인증에 실패했습니다.");
-			String code = StringUtils.defaultIfBlank(authResult.getAuthResultCode(), "AUTH_FAILED");
+			// 서명 검증 전 브라우저 입력이다 — 에러코드는 형식이 맞을 때만, 메시지는 정제해서 쓴다.
+			String authResultCode = authResult.getAuthResultCode();
+			String code = authResultCode != null && AUTH_RESULT_CODE.matcher(authResultCode).matches() ? authResultCode : "AUTH_FAILED";
+			String message = StringUtils.defaultIfBlank(sanitizeAuthResultMsg(authResult.getAuthResultMsg()), "결제 인증에 실패했습니다.");
 			throw new CoreException(ErrorCode.of("NICEPAY_" + code, message, 400), message).addErrorLogData(logData);
 		}
 		if (StringUtils.isBlank(authResult.getTid()) || StringUtils.isBlank(authResult.getAuthToken())
@@ -102,14 +117,14 @@ public final class NicePayUtils {
 	 *                       NET_CANCELLED(결과불명 → 망취소 완료, 결제 미성립) / RESULT_UNKNOWN(망취소도 실패, 관리자 확인)
 	 */
 	public static NicePayDto.Payment approve(NicePayDto.ApproveRequest request) {
-		WebClient client = client();
+		Config current = config();
 		ValidateUtils.validate(request);
 		final Map<String, Object> logData = Map.of("orderId", request.getOrderId(), "tid", request.getTid());
 
 		NicePayDto.Payment payment;
 		try {
-			payment = WebClientUtils.post(client, "/v1/payments/{tid}", JSON_UTF8, Map.of("amount", request.getAmount()),
-				NicePayDto.Payment.class, request.getTid()).block();
+			payment = WebClientUtils.post(current.webClient(), "/v1/payments/{tid}", JSON_UTF8, Map.of("amount", request.getAmount()),
+				NicePayDto.Payment.class, request.getTid()).timeout(current.callTimeout()).block();
 		} catch (RuntimeException e) {
 			FailureType failureType = WebClientUtils.classify(e);
 			if (failureType == FailureType.REJECTED) {
@@ -132,7 +147,7 @@ public final class NicePayUtils {
 			throw rejected(payment).addErrorLogData(logData);
 		}
 
-		verifyApproved(payment, request);
+		verifyApproved(payment, request, current.property());
 		log.info("NICEPAY 승인 완료. orderId={}, tid={}, status={}, payMethod={}",
 			request.getOrderId(), payment.getTid(), payment.getStatus(), payment.getPayMethod());
 		return payment;
@@ -145,12 +160,12 @@ public final class NicePayUtils {
 	 * @throws CoreException BAD_REQUEST / NICEPAY_{resultCode}(망취소 거절) / RESULT_UNKNOWN / EXTERNAL_ERROR
 	 */
 	public static NicePayDto.Payment netCancel(String orderId) {
-		WebClient client = client();
+		Config current = config();
 		if (StringUtils.isBlank(orderId)) {
 			throw new CoreException(CommonErrorCode.BAD_REQUEST, "orderId 가 없습니다.");
 		}
-		NicePayDto.Payment payment = call(() -> WebClientUtils.post(client, "/v1/payments/netcancel", JSON_UTF8,
-				Map.of("orderId", orderId), NicePayDto.Payment.class).block(),
+		NicePayDto.Payment payment = call(() -> WebClientUtils.post(current.webClient(), "/v1/payments/netcancel", JSON_UTF8,
+				Map.of("orderId", orderId), NicePayDto.Payment.class).timeout(current.callTimeout()).block(),
 			"망취소", Map.of("orderId", orderId));
 		log.info("NICEPAY 망취소 완료. orderId={}, tid={}", orderId, payment.getTid());
 		return payment;
@@ -164,12 +179,12 @@ public final class NicePayUtils {
 	 * @throws CoreException BAD_REQUEST / NICEPAY_{resultCode}(취소 거절) / RESULT_UNKNOWN(관리자 확인 — 재시도 시 이중취소 위험)
 	 */
 	public static NicePayDto.Payment cancel(String tid, NicePayDto.CancelRequest request) {
-		WebClient client = client();
+		Config current = config();
 		requireTid(tid);
 		ValidateUtils.validate(request);
 
-		NicePayDto.Payment payment = call(() -> WebClientUtils.post(client, "/v1/payments/{tid}/cancel", JSON_UTF8, request,
-				NicePayDto.Payment.class, tid).block(),
+		NicePayDto.Payment payment = call(() -> WebClientUtils.post(current.webClient(), "/v1/payments/{tid}/cancel", JSON_UTF8, request,
+				NicePayDto.Payment.class, tid).timeout(current.callTimeout()).block(),
 			"취소", Map.of("tid", tid, "orderId", request.getOrderId()));
 		log.info("NICEPAY 취소 완료. tid={}, cancelledTid={}, status={}, balanceAmt={}",
 			tid, payment.getCancelledTid(), payment.getStatus(), payment.getBalanceAmt());
@@ -182,9 +197,10 @@ public final class NicePayUtils {
 	 * @throws CoreException BAD_REQUEST / NICEPAY_{resultCode} / RESULT_UNKNOWN(통신 오류)
 	 */
 	public static NicePayDto.Payment getPayment(String tid) {
-		WebClient client = client();
+		Config current = config();
 		requireTid(tid);
-		return call(() -> WebClientUtils.get(client, "/v1/payments/{tid}", null, NicePayDto.Payment.class, tid).block(),
+		return call(() -> WebClientUtils.get(current.webClient(), "/v1/payments/{tid}", null, NicePayDto.Payment.class, tid)
+										 .timeout(current.callTimeout()).block(),
 			"조회", Map.of("tid", tid));
 	}
 
@@ -216,13 +232,20 @@ public final class NicePayUtils {
 	}
 
 	/** 승인 응답의 서명 → 주문번호 → 금액 → 상태 순으로 대조한다 — 서명이 틀리면 나머지 값도 믿을 수 없어 먼저 본다 */
-	private static void verifyApproved(NicePayDto.Payment payment, NicePayDto.ApproveRequest request) {
+	private static void verifyApproved(NicePayDto.Payment payment, NicePayDto.ApproveRequest request, NicePayProperty property) {
 		final Map<String, Object> logData = Map.of("orderId", request.getOrderId(), "tid", String.valueOf(payment.getTid()));
 
-		// 서명은 유효 거래에만 온다(매뉴얼) — 비어 있으면 검증을 건너뛰고 아래 대조로 판단한다.
-		if (StringUtils.isNotBlank(payment.getSignature())) {
+		// 서명은 유효 거래에만 온다(매뉴얼) — 성공 상태(paid·가상계좌 발급)인데 없으면 위변조로 본다.
+		// 그 외 상태는 아래 대조에서 RESULT_UNKNOWN 으로 끝난다.
+		if (StringUtils.isBlank(payment.getSignature())) {
+			if (payment.isPaid() || payment.isVbankReady()) {
+				throw new CoreException(NicePayError.SIGNATURE_MISMATCH, "결제 응답에 서명이 없습니다. 위변조가 의심되어 취소가 필요합니다.")
+					.addErrorLogData(logData)
+					.addErrorLogData("status", payment.getStatus());
+			}
+		} else {
 			String expected = NicePaySignature.ofPayment(payment.getTid(), payment.getAmount(), payment.getEdiDate(),
-				nicePayProperty.getSecretKey());
+				property.getSecretKey());
 			if (!NicePaySignature.matches(expected, payment.getSignature())) {
 				throw new CoreException(NicePayError.SIGNATURE_MISMATCH, "결제 응답 위변조가 의심됩니다. 취소가 필요합니다.")
 					.addErrorLogData(logData);
@@ -293,6 +316,14 @@ public final class NicePayUtils {
 		return rejected(body);
 	}
 
+	/** 제어·서식 문자를 지우고 길이를 제한한다 — 남는 게 없으면 null */
+	private static String sanitizeAuthResultMsg(String message) {
+		if (message == null) {
+			return null;
+		}
+		return StringUtils.trimToNull(StringUtils.truncate(UNSAFE_CHARS.matcher(message).replaceAll("").trim(), MAX_AUTH_RESULT_MSG_LENGTH));
+	}
+
 	private static void requireTid(String tid) {
 		if (StringUtils.isBlank(tid)) {
 			throw new CoreException(CommonErrorCode.BAD_REQUEST, "tid 가 없습니다.");
@@ -300,15 +331,15 @@ public final class NicePayUtils {
 	}
 
 	/** 초기화 여부를 확인한다 — client-key 미설정이면 자동설정이 꺼져 있어 여기서 드러난다 */
-	private static WebClient client() {
-		if (webClient == null) {
+	private static Config config() {
+		Config current = config;
+		if (current == null) {
 			throw new CoreException(CommonErrorCode.INTERNAL_SERVER, "NicePayUtils 미초기화 - payment.nice.client-key 설정 확인");
 		}
-		return webClient;
+		return current;
 	}
 
-	private static NicePayProperty property() {
-		client();
-		return nicePayProperty;
+	/** 기동 시 정해지는 호출 설정 — 불변 */
+	private record Config(WebClient webClient, NicePayProperty property, Duration callTimeout) {
 	}
 }

@@ -1,5 +1,9 @@
 package com.corelib.common.response;
 
+import com.corelib.common.error.CommonErrorCode;
+import com.corelib.common.exception.CoreException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 
@@ -18,7 +22,8 @@ public final class PageResponse<T> {
 	private final boolean isLast;
 
 	private PageResponse(List<T> content, int page, int size, long totalElements) {
-		this.content = List.copyOf(content);
+		// List.copyOf 는 null 원소에서 NPE — 매핑 결과·메모리 목록의 null 항목도 그대로 담는다
+		this.content = Collections.unmodifiableList(new ArrayList<>(content));
 		this.page = page;
 		this.size = size;
 		this.totalElements = totalElements;
@@ -32,8 +37,17 @@ public final class PageResponse<T> {
 		return new PageResponse<>(content, page, size, totalElements);
 	}
 
-	/** 메모리 목록을 잘라 한 페이지 — 건수가 적은 목록·예제용 (DB 는 쿼리로 자른다) */
+	/**
+	 * 메모리 목록을 잘라 한 페이지 — 건수가 적은 목록·예제용 (DB 는 쿼리로 자른다)
+	 * @throws CoreException C400 (음수 page, 1 미만 size) — {@link PageUtils#pageable} 과 같은 기준
+	 */
 	public static <T> PageResponse<T> slice(List<T> all, int page, int size) {
+		if (page < 0) {
+			throw new CoreException(CommonErrorCode.BAD_REQUEST, "page 는 0 이상이어야 합니다.");
+		}
+		if (size < 1) {
+			throw new CoreException(CommonErrorCode.BAD_REQUEST, "size 는 1 이상이어야 합니다.");
+		}
 		int from = (int) Math.min((long) page * size, all.size());
 		int to = (int) Math.min((long) from + size, all.size());
 		return new PageResponse<>(all.subList(from, to), page, size, all.size());

@@ -17,12 +17,14 @@ import org.junit.jupiter.api.Test;
 
 class TossPayUtilsTest {
 
+	private static final Duration CALL_TIMEOUT = Duration.ofSeconds(10);
+
 	private MockHttpServer server;
 
 	@BeforeEach
 	void setUp() {
 		server = MockHttpServer.start();
-		TossPayUtils.initialize(WebClientUtils.builder(server.baseUrl(), Duration.ofSeconds(1), Duration.ofMillis(500)).build());
+		TossPayUtils.initialize(WebClientUtils.builder(server.baseUrl(), Duration.ofSeconds(1), Duration.ofMillis(500)).build(), CALL_TIMEOUT);
 	}
 
 	@AfterEach
@@ -136,7 +138,8 @@ class TossPayUtilsTest {
 	@Test
 	@DisplayName("연결 거부 - 요청 미전송이라 결과확정(EXTERNAL_ERROR), 재조회 안 함")
 	void confirm_connectionRefused() {
-		TossPayUtils.initialize(WebClientUtils.builder(MockHttpServer.closedPortUrl(), Duration.ofSeconds(1), Duration.ofSeconds(1)).build());
+		TossPayUtils.initialize(WebClientUtils.builder(MockHttpServer.closedPortUrl(), Duration.ofSeconds(1), Duration.ofSeconds(1)).build(),
+			CALL_TIMEOUT);
 
 		assertThatThrownBy(() -> TossPayUtils.confirm(request()))
 			.extracting(TossPayUtilsTest::errorCodeOf)
@@ -152,6 +155,43 @@ class TossPayUtilsTest {
 			.extracting(TossPayUtilsTest::errorCodeOf)
 			.isEqualTo(CommonErrorCode.BAD_REQUEST);
 		assertThat(server.requestCount()).isZero();
+	}
+
+	@Test
+	@DisplayName("금액 상한 - 승인 금액·취소 금액이 999,999,999 를 넘으면 BAD_REQUEST (토스 호출 전 차단)")
+	void amount_upperBound() {
+		TossPayDto.ConfirmRequest tooLarge = TossPayDto.ConfirmRequest.builder().paymentKey("pk_1").orderId("order-1")
+			.amount(1_000_000_000).build();
+		TossPayDto.CancelRequest tooLargeCancel = TossPayDto.CancelRequest.builder().cancelReason("고객 변심")
+			.cancelAmount(1_000_000_000).build();
+
+		assertThatThrownBy(() -> TossPayUtils.confirm(tooLarge))
+			.extracting(TossPayUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThatThrownBy(() -> TossPayUtils.cancel("pk_1", tooLargeCancel))
+			.extracting(TossPayUtilsTest::errorCodeOf).isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThat(server.requestCount()).isZero();
+	}
+
+	@Test
+	@DisplayName("전체 상한 초과 - 읽기 timeout 전이어도 결과불명으로 보고 재조회로 확정")
+	void confirm_callTimeout_recheck() {
+		// 읽기 timeout(10초)보다 전체 상한(300ms)이 먼저 끊는다
+		TossPayUtils.initialize(WebClientUtils.builder(server.baseUrl(), Duration.ofSeconds(1), Duration.ofSeconds(10)).build(),
+			Duration.ofMillis(300));
+		server.enqueue(MockResponse.ok(payment("DONE", 10000)).delayed(Duration.ofSeconds(2)));
+		server.enqueue(MockResponse.ok(payment("DONE", 10000)));
+
+		assertThat(TossPayUtils.confirm(request()).isDone()).isTrue();
+		assertThat(server.requestCount()).isEqualTo(2);
+		assertThat(server.request(1).method()).isEqualTo("GET");
+	}
+
+	@Test
+	@DisplayName("전체 상한 - 연결 + 읽기 + 5초")
+	void property_callTimeout() {
+		TossPayProperty property = new TossPayProperty();
+
+		assertThat(property.callTimeout()).isEqualTo(Duration.ofSeconds(40));
 	}
 
 	@Test

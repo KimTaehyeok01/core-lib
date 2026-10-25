@@ -12,8 +12,8 @@
 1. **의존성** — 필요한 모듈만 ([모듈 목록](#모듈-목록), 저장소 설정은 [설치](#설치))
    ```groovy
    dependencies {
-       implementation 'com.corelib:common:0.1.0'
-       implementation 'com.corelib:payment-toss:0.1.0'
+       implementation 'com.corelib:common:0.2.0'
+       implementation 'com.corelib:payment-toss:0.2.0'
    }
    ```
 2. **yml** — 모듈 README 의 "설정" 절 (키는 `${환경변수}` 로만)
@@ -124,16 +124,32 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 | 항목 | 내용 |
 |------|------|
 | KCB 결과 필드명 | 호출 규격(서비스명·form 필드)은 공개 샘플로 확인했지만 결과 필드명(RSLT_NAME 등)은 공개 자료로 확정하지 못했다. 계약 가이드와 다르면 `ConfirmResponse.getRaw()` 로 꺼내 쓰고 매핑을 고친다 |
-| netty 버전 | webclient 모듈이 netty 를 4.1.139.Final 로 올린다(Boot 3.5.16 기본 4.1.135 는 CVE 10건). 소비 앱이 Spring dependency-management 플러그인을 쓰면 BOM 이 다시 내릴 수 있으니 `ext['netty.version'] = '4.1.139.Final'` 를 지정한다 |
+| netty 버전 | webclient 모듈이 netty 를 4.1.139.Final 로 올린다(Boot 3.5.16 기본 4.1.135 는 CVE 10건). Gradle 소비 앱은 자동 적용. Spring dependency-management 플러그인을 쓰면 `ext['netty.version'] = '4.1.139.Final'`, Maven 은 `<netty.version>4.1.139.Final</netty.version>` 을 지정한다 |
 | Spring 6.2 CVE | spring-webmvc CVE-2026-47890·47884, spring-webflux CVE-2026-47892 는 7.0.9 에서만 수정됐다. 각각 SSE fragment·XsltView·WebFlux **서버** 함수형 라우팅 문제라 이 라이브러리 사용 범위와 무관. Boot 4 전환 시 해소 |
 | 런타임 검증 | 모든 벤더 연동은 공식 스펙 + 단위테스트(로컬 HTTP 서버·가짜 모듈)로 검증했다. 실제 키·계약으로 호출해 보는 검증은 별도로 필요 (KSPAY 는 실제 승인 서버 응답 해석까지 확인) |
-| KSPAY 승인 불일치 | 승인 응답의 상점아이디·주문번호·금액이 다르면 예외에 TID 가 없어 자동취소할 수 없다 — 예제는 결과불명(관리자 확인)으로 둔다 |
+| KSPAY 승인 불일치 | 승인 응답의 상점아이디·주문번호·금액이 다르면 `KsPayMismatchException` 의 tid·payMethod 로 자동취소할 수 있다 (`isCancelable()` — 상점아이디 불일치는 불가) |
+| 설정 키 규칙 | 벤더 연동은 자기 이름(`auth.nice.*`, `payment.toss.*` 등), 그 외 모듈은 `core.*` |
 | static 설정 | Utils 는 설정·도구를 static 으로 든다 — 한 JVM 에 Spring 앱을 둘 이상 띄우면 나중에 뜬 쪽 설정이 이긴다(일반 서비스는 무관) |
 | JitPack | `jitpack.yml` 은 있으나 release 태그로 실제 빌드해 본 적은 아직 없다 |
 
+## 0.2.0 변경점 (동작이 바뀐 것)
+
+| 모듈 | 변경 |
+|------|------|
+| common | 5xx `CoreException` 은 응답 메시지를 에러코드 기본 문구로 고정 (상세는 서버 로그) / 깨진 multipart C400, 업로드 크기 초과 C413 / `PageResponse.slice` 의 page<0·size<1 은 C400 |
+| web | 요청 로그 마스킹을 JSON 파싱 방식으로 교체 — 잘린·깨진 본문은 내용 없이 크기만 / Swagger·api-docs·actuator/info 기본 비공개 (`core.web.security.public-docs: true` 로 공개) / `SecurityExceptionHandler` 를 `core.web.security.enabled` 와 분리, 익명 AccessDenied → 401 / 요청 로그 기본 maskKeys 확대, 응답 로그는 스트리밍 비버퍼링 / `MdcTaskDecorator` 는 원복 |
+| jwt | 공개 경로에서는 잘못된·만료된 Bearer 토큰을 무시 / `JwtAuthenticationFilter()` 생성자 인자 없음 / nimbus·crypto 를 implementation 으로 (직접 쓰면 따로 선언) |
+| file | 확장자는 영문 소문자·숫자 1~10자만 / 차단 확장자 확대 / 저장 Content-Type 은 확장자로 서버가 정함 (클라이언트 값 무시) / S3 presign 은 attachment / 키에 제어문자·NUL·Windows 금지 문자(`<>:"\|?*`) 포함 시 INVALID_FILE (이전 버전으로 저장된 그런 키는 다운로드·삭제 불가) / `FileUtils` 초기화 시점이 `SmartInitializingSingleton` 으로 이동 — 다른 빈의 생성자·@PostConstruct 에서는 사용 불가 |
+| crypto | AES-GCM 암호화 IV 는 12byte 만 (복호화는 12·16) / 빈 salt·null 입력은 CoreException |
+| excel | 읽기 스트리밍 + 행 상한 즉시 중단 / 선두 공백 행은 건너뛰고 다음 행을 헤더로, 매칭 열이 0 이면 INVALID_FILE / CSV 수식 이스케이프는 문자열 열만 / 15자리 넘는 숫자는 문자열 셀 / `ZipSecureFile` 전역 상한(최소 압축비 1%, 엔트리 100MB) |
+| image·mail | ImageIO 전역 설정을 바꾸지 않음 / 메일 SMTP timeout 기본값(10s/30s/30s) 주입 |
+| webclient | 커넥션 풀·응답 본문 2MB 상한 / 풀 대기 초과는 NOT_SENT |
+| auth·payment | NICE 인증 설정 오류는 기동 실패, 벤더 base-url·popup-url 은 https 강제(loopback 예외) / KCB 라이선스 경로·returnUrl 기동 검증, `auth.nice.tx-ttl` 10분 상한 / KCB `StartRequest.returnUrl` 형식·250byte 요구 (BAD_REQUEST) / KCB 호출 timeout(`auth.kcb.timeout`, 기본 10s), 호출 풀 유한 큐로 포화 시 즉시 EXTERNAL_ERROR / NICE 인증 호출도 전체 상한(connect+read+5s) 적용 / 결제 호출 전체 상한(connect+read+5s) / KSPAY 취소 4xx 는 `KSPAY_{code}` 로 (이전엔 연결 불가) / NICEPAY 성공 응답에 서명 필수 / 금액 상한 999,999,999 |
+| 빌드 | `options.release = 17` |
+
 ## 설치
 
-빌드 설정의 그룹은 `com.corelib`, 버전은 `0.1.0` 이다. 의존성 좌표는 `com.corelib:{artifactId}:0.1.0`.
+빌드 설정의 그룹은 `com.corelib`, 버전은 `0.2.0` 이다. 의존성 좌표는 `com.corelib:{artifactId}:0.2.0`.
 
 ### 내 PC 에서 바로 (mavenLocal)
 ```bash
@@ -145,7 +161,7 @@ repositories { mavenLocal(); mavenCentral() }
 이 PC 에서만 동작한다 — 다른 PC·배포 서버에서 빌드하려면 아래 원격 저장소가 필요하다.
 
 ### GitHub Packages (다른 PC·서버에서 쓰기)
-의존성 줄에는 `com.corelib:{artifactId}:0.1.0` 만 보인다. 저장소 주소에만 계정 이름이 들어간다(GitHub Packages 규칙).
+의존성 줄에는 `com.corelib:{artifactId}:0.2.0` 만 보인다. 저장소 주소에만 계정 이름이 들어간다(GitHub Packages 규칙).
 
 **1. 토큰 만들기** — GitHub → Settings → Developer settings → Personal access tokens → **Tokens (classic)**
 - 올리는 PC: `write:packages` (`read:packages` 포함)
@@ -163,7 +179,7 @@ gpr.key=발급받은토큰
 ```bash
 ./gradlew publish
 ```
-- 같은 버전은 다시 올릴 수 없다 — 고쳤으면 루트 `build.gradle` 의 `version` 을 올린다 (0.1.0 → 0.1.1).
+- 같은 버전은 다시 올릴 수 없다 — 고쳤으면 루트 `build.gradle` 의 `version` 을 올린다 (0.2.0 → 0.2.1).
 - 올릴 코드는 main 에 합친 뒤 올리는 것을 권장한다.
 
 **4. 쓰는 프로젝트** (`build.gradle`)
@@ -179,8 +195,8 @@ repositories {
     }
 }
 dependencies {
-    implementation 'com.corelib:common:0.1.0'
-    implementation 'com.corelib:payment-toss:0.1.0'
+    implementation 'com.corelib:common:0.2.0'
+    implementation 'com.corelib:payment-toss:0.2.0'
 }
 ```
 

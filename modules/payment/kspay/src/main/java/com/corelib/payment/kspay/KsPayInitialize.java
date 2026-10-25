@@ -17,10 +17,10 @@ public class KsPayInitialize {
 	public KsPayInitialize(KsPayProperty property) {
 		property.validate();
 
-		WebClient approvalClient = WebClientUtils.builder(property.getApprovalBaseUrl(), property.getConnectTimeout(),
+		WebClient approvalClient = WebClientUtils.builder(property.resolvedApprovalBaseUrl(), property.getConnectTimeout(),
 			property.getReadTimeout()).build();
 		// webfep 인증 = "pgapi " + KSTA 의 pgapi 키 — 키가 없으면 헤더 없이 만들고 cancel() 이 설정 오류로 알린다
-		WebClient webfepClient = WebClientUtils.builder(property.getWebfepBaseUrl(), property.getConnectTimeout(),
+		WebClient webfepClient = WebClientUtils.builder(property.resolvedWebfepBaseUrl(), property.getConnectTimeout(),
 				property.getReadTimeout())
 			.defaultHeaders(headers -> {
 				if (StringUtils.isNotBlank(property.getApiKey())) {
@@ -28,6 +28,6 @@ public class KsPayInitialize {
 				}
 			})
 			.build();
-		KsPayUtils.initialize(property, approvalClient, webfepClient);
+		KsPayUtils.initialize(property, approvalClient, webfepClient, property.callTimeout());
 	}
 }

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.corelib.common.exception.CoreException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Locale;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -95,5 +96,35 @@ class OtpUtilsTest {
 		OtpProperty property = new OtpProperty();
 		property.setDigits(10);
 		assertThatThrownBy(() -> OtpUtils.initialize(property)).isInstanceOf(CoreException.class);
+	}
+
+	@Test
+	@DisplayName("기본 로케일 무관 — 태국 숫자 로케일에서도 ASCII 코드·다른 숫자 체계 입력 거부, 터키어 로케일에서도 소문자 비밀키 해석")
+	void localeIndependent() {
+		Locale original = Locale.getDefault();
+		Locale originalFormat = Locale.getDefault(Locale.Category.FORMAT);
+		Locale originalDisplay = Locale.getDefault(Locale.Category.DISPLAY);
+		try {
+			Locale.setDefault(Locale.forLanguageTag("th-TH-u-nu-thai"));
+			String rfcSecret = OtpUtils.base32Encode(rfcSeed(OtpAlgorithm.SHA1));
+			OtpUtils.initialize(eightDigits(OtpAlgorithm.SHA1));
+			assertThat(OtpUtils.generateCode(rfcSecret, Instant.ofEpochSecond(59))).isEqualTo("94287082");
+
+			OtpUtils.initialize(new OtpProperty());
+			String secret = OtpUtils.generateSecret();
+			String code = OtpUtils.generateCode(secret, Instant.now());
+			assertThat(code).matches("[0-9]{6}");
+			assertThat(OtpUtils.verify(secret, code).isValid()).isTrue();
+			// ASCII 로 바꾸면 둘 다 '?' 가 되는 숫자들 — 코드가 로케일 숫자로 찍히면 아무 값이나 통과하던 경로
+			assertThat(OtpUtils.verify(secret, "๑๒๓๔๕๖").isValid()).isFalse();
+			assertThat(OtpUtils.verify(secret, "١٢٣٤٥٦").isValid()).isFalse();
+
+			Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+			assertThat(OtpUtils.base32Decode("iiiiiiii")).isEqualTo(OtpUtils.base32Decode("IIIIIIII"));
+		} finally {
+			Locale.setDefault(original);
+			Locale.setDefault(Locale.Category.FORMAT, originalFormat);
+			Locale.setDefault(Locale.Category.DISPLAY, originalDisplay);
+		}
 	}
 }

@@ -2,8 +2,9 @@
 
 dependencies {
     api project(':modules:common')
-    api project(':modules:crypto')                       // PEM 키 읽기
-    api 'com.nimbusds:nimbus-jose-jwt:10.10'             // 2026-09-17, OSV 0건
+    // 공개 시그니처에 crypto·nimbus 타입이 없다 — 소비처 컴파일 classpath 로 새지 않게 implementation (POM 에서는 runtime)
+    implementation project(':modules:crypto')            // PEM 키 읽기
+    implementation 'com.nimbusds:nimbus-jose-jwt:10.10'  // 2026-09-17, OSV 0건
 
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
     compileOnly 'org.slf4j:slf4j-api'
@@ -12,7 +13,6 @@ dependencies {
     compileOnly 'org.springframework.boot:spring-boot-starter-security'
     compileOnly 'jakarta.servlet:jakarta.servlet-api'
     compileOnly 'org.springframework:spring-webmvc'
-    compileOnly 'com.fasterxml.jackson.core:jackson-databind'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-web'

@@ -52,8 +52,9 @@ public class WebStartupReport {
 			WebProperty.Security security = property.getObject().getSecurity();
 			String access = security.getDefaultAccess() == WebProperty.DefaultAccess.AUTHENTICATED ? "인증 필요" : "모두 허용";
 			String cors = security.getCorsAllowedOrigins().isEmpty() ? "CORS 없음" : "CORS " + security.getCorsAllowedOrigins();
+			String docs = security.isPublicDocs() ? "API 문서 공개" : "API 문서 비공개(public-docs=false)";
 			return StartupReport.ready("Security", "core 기본 체인 — 기본 접근=" + access + ", 추가 공개 경로 "
-				+ security.getPermitPaths().size() + "개, " + cors);
+				+ security.getPermitPaths().size() + "개, " + docs + ", " + cors);
 		};
 	}
 }

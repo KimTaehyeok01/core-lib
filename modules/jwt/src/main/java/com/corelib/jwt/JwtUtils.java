@@ -100,8 +100,9 @@ public final class JwtUtils {
 		}
 		try {
 			SignedJWT jwt = SignedJWT.parse(token.trim());
+			// 헤더 alg 는 서명 확인 전의 공격자 입력 — 로그 위조를 막으려 원문은 남기지 않고 설정 쪽 알고리즘만 남긴다
 			if (!current.algorithm.equals(jwt.getHeader().getAlgorithm())) {
-				throw new CoreException(JwtError.INVALID).addErrorLogData("alg", String.valueOf(jwt.getHeader().getAlgorithm()));
+				throw new CoreException(JwtError.INVALID).addErrorLogData("expectedAlg", current.algorithm.getName());
 			}
 			if (!jwt.verify(current.verifier)) {
 				throw new CoreException(JwtError.INVALID);

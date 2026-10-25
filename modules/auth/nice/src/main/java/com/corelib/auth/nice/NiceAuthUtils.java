@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -51,16 +52,15 @@ public final class NiceAuthUtils {
 													   .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
 													   .build();
 
-	private static WebClient webClient;
-	private static NiceAuthProperty niceAuthProperty;
+	/** WebClient·설정을 한 번에 바꾼다 — 호출 중인 스레드가 섞인 조합을 보지 않게 */
+	private static volatile Config config;
 
 	private NiceAuthUtils() {
 	}
 
 	/** 기동 시 {@link NiceAuthInitialize} 가 1회 호출한다 — 소비자가 직접 부르지 않는다 */
-	static void initialize(WebClient initializeWebClient, NiceAuthProperty initializeNiceAuthProperty) {
-		webClient = initializeWebClient;
-		niceAuthProperty = initializeNiceAuthProperty;
+	static void initialize(WebClient initializeWebClient, NiceAuthProperty initializeNiceAuthProperty, Duration callTimeout) {
+		config = new Config(initializeWebClient, initializeNiceAuthProperty, callTimeout);
 	}
 
 	/**
@@ -71,7 +71,8 @@ public final class NiceAuthUtils {
 	 * @throws CoreException BAD_REQUEST(요청값·URL 형식) / NICE_{result_code}(벤더 거절) / EXTERNAL_ERROR(통신)
 	 */
 	public static NiceAuthDto.VerificationResponse verification(NiceAuthDto.VerificationRequest request) {
-		NiceAuthProperty property = property();
+		Config current = config();
+		NiceAuthProperty property = current.property();
 		NiceAuthDto.VerificationRequest safeRequest = request == null ? NiceAuthDto.VerificationRequest.builder().build() : request;
 		ValidateUtils.validate(safeRequest);
 
@@ -83,8 +84,8 @@ public final class NiceAuthUtils {
 		String returnUrl = NiceAuthRequestSupport.returnUrl(safeRequest.getReturnUrl(), property.getReturnUrl());
 		String closeUrl = NiceAuthRequestSupport.closeUrl(safeRequest.getCloseUrl(), property.getCloseUrl());
 
-		NiceAuthDto.TokenResponse token = requestToken(property, tokenRequestNo);
-		NiceAuthDto.UrlResponse authUrl = requestAuthUrl(property, safeRequest, authRequestNo, returnUrl, closeUrl,
+		NiceAuthDto.TokenResponse token = requestToken(current, tokenRequestNo);
+		NiceAuthDto.UrlResponse authUrl = requestAuthUrl(current, safeRequest, authRequestNo, returnUrl, closeUrl,
 			token.getAccessToken());
 
 		long issuedAt = System.currentTimeMillis();
@@ -112,11 +113,12 @@ public final class NiceAuthUtils {
 	 *                       INTEGRITY_FAILED / DECRYPT_FAILED / RESULT_INCOMPLETE / EXTERNAL_ERROR
 	 */
 	public static NiceAuthDto.VerificationConfirmResponse verificationConfirm(NiceAuthDto.VerificationConfirmRequest request) {
-		NiceAuthProperty property = property();
+		Config current = config();
+		NiceAuthProperty property = current.property();
 		ValidateUtils.validate(request);
 
 		NiceAuthTxSealer.TxState tx = NiceAuthTxSealer.unseal(request.getTxNo(), property.getClientSecret(), property.getTxTtl(), JSON);
-		NiceAuthDto.ResultResponse result = requestResult(property, tx, request.getWebTransactionId());
+		NiceAuthDto.ResultResponse result = requestResult(current, tx, request.getWebTransactionId());
 
 		// NICE 는 결과 요청에 쓴 access_token 의 ticket·iterators 로 암호화한다 — 봉인해 둔 같은 토큰 값을 쓴다.
 		String keyString = NiceAuthCrypto.deriveKeyString(tx.ticket(), tx.transactionId(), tx.iterators());
@@ -140,7 +142,8 @@ public final class NiceAuthUtils {
 	 * 접근 토큰을 발급받는다.
 	 * @implNote Basic 값은 표준 base64 가 아니라 base64url(무패딩)이라 HttpHeaders.setBasicAuth 를 쓰지 않는다
 	 */
-	private static NiceAuthDto.TokenResponse requestToken(NiceAuthProperty property, String requestNo) {
+	private static NiceAuthDto.TokenResponse requestToken(Config current, String requestNo) {
+		NiceAuthProperty property = current.property();
 		String credentials = Base64Utils.encodeUrl(
 			(property.getClientId() + ":" + property.getClientSecret()).getBytes(StandardCharsets.UTF_8));
 
@@ -148,7 +151,7 @@ public final class NiceAuthUtils {
 		body.put("grant_type", "client_credentials");
 		body.put("request_no", requestNo);
 
-		NiceAuthDto.TokenResponse response = post(TOKEN_PATH, headers -> headers.set(HttpHeaders.AUTHORIZATION, "Basic " + credentials),
+		NiceAuthDto.TokenResponse response = post(current, TOKEN_PATH, headers -> headers.set(HttpHeaders.AUTHORIZATION, "Basic " + credentials),
 			body, NiceAuthDto.TokenResponse.class, Map.of("requestNo", requestNo));
 		if (StringUtils.isBlank(response.getAccessToken()) || StringUtils.isBlank(response.getTicket())
 				|| response.getIterators() == null || response.getExpiresIn() == null) {
@@ -158,8 +161,9 @@ public final class NiceAuthUtils {
 	}
 
 	/** 표준창 URL 과 transaction_id 를 발급받는다 — transaction_id 는 결과 조회 키이자 키 유도 salt 다 */
-	private static NiceAuthDto.UrlResponse requestAuthUrl(NiceAuthProperty property, NiceAuthDto.VerificationRequest request,
+	private static NiceAuthDto.UrlResponse requestAuthUrl(Config current, NiceAuthDto.VerificationRequest request,
 														  String requestNo, String returnUrl, String closeUrl, String accessToken) {
+		NiceAuthProperty property = current.property();
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("request_no", requestNo);
 		body.put("return_url", returnUrl);
@@ -173,7 +177,7 @@ public final class NiceAuthUtils {
 			body.put("exp_mods", expMods.stream().map(NiceAuthDto.ExpMod::getCode).distinct().toList());
 		}
 
-		NiceAuthDto.UrlResponse response = post(URL_PATH, headers -> headers.setBearerAuth(accessToken), body,
+		NiceAuthDto.UrlResponse response = post(current, URL_PATH, headers -> headers.setBearerAuth(accessToken), body,
 			NiceAuthDto.UrlResponse.class, Map.of("requestNo", requestNo));
 		if (StringUtils.isBlank(response.getAuthUrl()) || StringUtils.isBlank(response.getTransactionId())) {
 			throw new CoreException(NiceAuthError.EXTERNAL_ERROR, "NICE 표준창 응답 필드가 비어 있습니다.").addErrorLogData("requestNo", requestNo);
@@ -182,14 +186,14 @@ public final class NiceAuthUtils {
 	}
 
 	/** 인증 결과 암호문을 조회한다 — request_no 는 토큰이 아니라 표준창 발급에 쓴 값이어야 한다 */
-	private static NiceAuthDto.ResultResponse requestResult(NiceAuthProperty property, NiceAuthTxSealer.TxState tx,
+	private static NiceAuthDto.ResultResponse requestResult(Config current, NiceAuthTxSealer.TxState tx,
 															String webTransactionId) {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("web_transaction_id", webTransactionId);
 		body.put("transaction_id", tx.transactionId());
 		body.put("request_no", tx.requestNo());
 
-		NiceAuthDto.ResultResponse response = post(RESULT_PATH, headers -> headers.setBearerAuth(tx.accessToken()), body,
+		NiceAuthDto.ResultResponse response = post(current, RESULT_PATH, headers -> headers.setBearerAuth(tx.accessToken()), body,
 			NiceAuthDto.ResultResponse.class, Map.of("requestNo", tx.requestNo(), "transactionId", tx.transactionId()));
 		if (StringUtils.isBlank(response.getEncData()) || StringUtils.isBlank(response.getIntegrityValue())) {
 			throw new CoreException(NiceAuthError.EXTERNAL_ERROR, "NICE 결과 응답 필드가 비어 있습니다.")
@@ -203,16 +207,16 @@ public final class NiceAuthUtils {
 	 * @implNote 1xxx 는 HTTP 400/500, 3xxx 는 HTTP 200 으로 온다 — 4xx 본문의 result_code 도 살린다.
 	 *           본인인증은 금전 거래가 없어 결과불명도 재인증으로 복구된다 — 통신 오류는 EXTERNAL_ERROR 하나로 묶는다
 	 */
-	private static <T extends NiceAuthDto.VendorResponse> T post(String path, Consumer<HttpHeaders> authorization,
+	private static <T extends NiceAuthDto.VendorResponse> T post(Config current, String path, Consumer<HttpHeaders> authorization,
 																	Map<String, Object> body, Class<T> responseType,
 																	Map<String, ?> logData) {
 		T response;
 		try {
-			response = WebClientUtils.post(webClient, path, headers -> {
+			response = WebClientUtils.post(current.webClient(), path, headers -> {
 				headers.setContentType(new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8));
-				headers.set("X-Intc-DevLang", StringUtils.defaultIfBlank(niceAuthProperty.getDevLang(), NiceAuthProperty.DEFAULT_DEV_LANG));
+				headers.set("X-Intc-DevLang", StringUtils.defaultIfBlank(current.property().getDevLang(), NiceAuthProperty.DEFAULT_DEV_LANG));
 				authorization.accept(headers);
-			}, body, responseType).block();
+			}, body, responseType).timeout(current.callTimeout()).block();
 		} catch (RuntimeException e) {
 			if (WebClientUtils.classify(e) == FailureType.REJECTED) {
 				throw vendorError(e, responseType).addErrorLogData(logData);
@@ -267,12 +271,16 @@ public final class NiceAuthUtils {
 		return plain;
 	}
 
-	/** 초기화와 설정을 확인한다 — 누락은 기동이 아니라 호출 시점에 드러난다 */
-	private static NiceAuthProperty property() {
-		if (webClient == null || niceAuthProperty == null) {
+	/** 초기화를 확인한다 — client-id 미설정이면 자동설정이 꺼져 여기서 드러난다. 설정 검증은 기동 때 {@link NiceAuthInitialize} 가 했다 */
+	private static Config config() {
+		Config current = config;
+		if (current == null) {
 			throw new CoreException(CommonErrorCode.INTERNAL_SERVER, "NiceAuthUtils 미초기화 - auth.nice.client-id 설정 확인");
 		}
-		niceAuthProperty.validate();
-		return niceAuthProperty;
+		return current;
+	}
+
+	/** 기동 시 정해지는 호출 설정 — 불변 */
+	private record Config(WebClient webClient, NiceAuthProperty property, Duration callTimeout) {
 	}
 }

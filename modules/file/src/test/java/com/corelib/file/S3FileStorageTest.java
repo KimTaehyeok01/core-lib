@@ -119,12 +119,24 @@ class S3FileStorageTest {
 	}
 
 	@Test
-	@DisplayName("getUrl - 버킷·키가 담긴 서명된 presigned URL (10분)")
+	@DisplayName("putObject Content-Type 은 확장자 기반 - a.png 를 text/html 로 보내도 image/png")
+	void contentTypeFromExtension() {
+		byte[] bytes = {1, 2, 3};
+
+		FileDto.StoredFile stored = storage.upload("img", "a.png", new ByteArrayInputStream(bytes), bytes.length, "text/html");
+
+		assertThat(lastPut.contentType()).isEqualTo("image/png");
+		assertThat(stored.getContentType()).isEqualTo("image/png");
+	}
+
+	@Test
+	@DisplayName("getUrl - 버킷·키가 담긴 서명된 presigned URL (10분), attachment 로 내려받게")
 	void presignedUrl() {
 		String url = storage.getUrl("docs/2026/10/18/a.pdf");
 
 		assertThat(url).contains("my-bucket").contains("docs/2026/10/18/a.pdf")
-					   .contains("X-Amz-Signature=").contains("X-Amz-Expires=600");
+					   .contains("X-Amz-Signature=").contains("X-Amz-Expires=600")
+					   .contains("response-content-disposition=attachment");
 	}
 
 	@Test

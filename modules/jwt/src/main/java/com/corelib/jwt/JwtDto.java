@@ -11,7 +11,7 @@ import lombok.Getter;
 /** jwt 요청·응답 데이터 */
 public class JwtDto {
 
-	/** 토큰 종류 — claim "typ" */
+	/** 토큰 종류 — claim "token_type" */
 	public enum TokenType {
 		/** API 호출용 — 짧게 (기본 30분) */
 		ACCESS,

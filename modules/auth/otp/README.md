@@ -5,7 +5,7 @@
 
 ## 의존성
 ```groovy
-implementation 'com.corelib:auth-otp:0.1.0'   // 저장소 설정은 루트 README "설치"
+implementation 'com.corelib:auth-otp:0.2.0'   // 저장소 설정은 루트 README "설치"
 ```
 
 ## 설정 (전부 기본값 있음)
@@ -45,6 +45,7 @@ if (result.isValid()) {
 - 비밀키는 비밀번호와 같다 — DB 에 평문으로 두지 말고 암호화한다. QR·수동 입력 키는 등록 화면에서만 보여 준다.
 - 해제(끄기)도 현재 코드를 받아야 한다 — 세션만 훔쳐서 2단계 인증을 끄지 못하게.
 - 코드 비교는 상수 시간이다.
+- 코드 생성·비밀키 해석은 서버 기본 로케일과 무관하다 (`Locale.ROOT`) — 태국 숫자(`th-TH-u-nu-thai`)·터키어 로케일에서도 OTP 앱과 같은 ASCII 코드가 나온다.
 
 ## 예제
 [`example/auth/otp`](../../../example/auth/otp) — 등록(QR) → 활성화 → 로그인 검증, 재사용 차단, 연속 실패 잠금, 비밀키 AES 암호화 저장

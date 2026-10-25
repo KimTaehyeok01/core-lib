@@ -9,6 +9,7 @@ import com.corelib.webclient.FailureType;
 import com.corelib.webclient.WebClientUtils;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -22,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 /**
  * KSPAY 결제 연동 진입점 — 무상태, 기대 주문번호/금액은 호출측이 보관한다.
@@ -31,6 +33,8 @@ import org.springframework.web.reactive.function.client.WebClient;
  *   <li>승인 결과불명이면 같은 결제키로 1회 재전송해 결과를 다시 받는다 (webfep 에는 거래 조회 API 가 없다)</li>
  *   <li>취소는 결과불명이어도 자동 재시도하지 않는다 — 이중취소 위험</li>
  *   <li>KSPAY 결과코드는 {@code KSPAY_{code}} 로 그대로 넘긴다</li>
+ *   <li>동기 호출이라 한 번에 최대 connect-timeout + read-timeout + 5초(승인 결과불명이면 재전송까지 2배) 스레드를 붙잡는다 —
+ *       {@code @Transactional}·DB 커넥션 점유 구간 밖에서 호출한다</li>
  * </ul>
  */
 @Slf4j
@@ -47,31 +51,32 @@ public final class KsPayUtils {
 	private static final MediaType FORM_UTF8 = new MediaType(MediaType.APPLICATION_FORM_URLENCODED, StandardCharsets.UTF_8);
 	private static final MediaType JSON_UTF8 = new MediaType(MediaType.APPLICATION_JSON, StandardCharsets.UTF_8);
 
-	private static KsPayProperty ksPayProperty;
-	private static WebClient approvalClient;
-	private static WebClient webfepClient;
+	/** 설정·클라이언트·전체 상한을 한 번에 바꾼다 — 호출 중인 스레드가 섞인 조합을 보지 않게 */
+	private static volatile Config config;
 
 	private KsPayUtils() {
 	}
 
-	/** 기동 시 {@link KsPayInitialize} 가 1회 호출한다 — 소비자가 직접 부르지 않는다 */
+	/**
+	 * 기동 시 {@link KsPayInitialize} 가 1회 호출한다 — 소비자가 직접 부르지 않는다.
+	 *
+	 * @param callTimeout {@code .block()} 전체 상한 — 초과는 읽기 timeout 과 같은 결과불명
+	 */
 	static void initialize(KsPayProperty initializeKsPayProperty, WebClient initializeApprovalClient,
-						   WebClient initializeWebfepClient) {
-		ksPayProperty = initializeKsPayProperty;
-		approvalClient = initializeApprovalClient;
-		webfepClient = initializeWebfepClient;
+						   WebClient initializeWebfepClient, Duration callTimeout) {
+		config = new Config(initializeKsPayProperty, initializeApprovalClient, initializeWebfepClient, callTimeout);
 	}
 
 	/**
 	 * 결제를 승인한다.
 	 *
 	 * @return 검증된 승인 결과 — tid 를 저장해 취소에 쓴다
+	 * @throws KsPayMismatchException MID_MISMATCH·ORDER_MISMATCH·AMOUNT_MISMATCH(승인 성립) — tid·payMethod 로 취소한다
 	 * @throws CoreException BAD_REQUEST(요청 검증, 주문번호 byte 초과) / KSPAY_{resultcd}(승인 거절) /
-	 *                       MID_MISMATCH·ORDER_MISMATCH·AMOUNT_MISMATCH(승인 성립, 확인·취소 필요) /
 	 *                       EXTERNAL_ERROR(결제키 무효·연결 실패) / RESULT_UNKNOWN(재전송으로도 확인 불가, KSTA 관리자 확인)
 	 */
 	public static KsPayDto.Approval approve(KsPayDto.ApproveRequest request) {
-		KsPayProperty property = property();
+		Config current = config();
 		ValidateUtils.validate(request);
 		if (MS949 == null) {
 			// 승인이 성립한 뒤 응답을 못 읽는 상황을 만들지 않도록 전송 전에 막는다.
@@ -86,19 +91,19 @@ public final class KsPayUtils {
 
 		KsPayDto.Approval approval;
 		try {
-			approval = postApproval(request);
+			approval = postApproval(current, request);
 		} catch (RuntimeException first) {
 			if (!isUnknown(first)) {
 				throw confirmedError(first).addErrorLogData(logData);
 			}
 			log.warn("KSPAY 승인 결과불명 - 같은 결제키로 1회 재전송. orderNo={}, 사유={}", request.getOrderNo(), first.getClass().getSimpleName());
-			approval = resendAfterUnknown(request, first);
+			approval = resendAfterUnknown(current, request, first);
 		}
 
 		if (!approval.isSuccess()) {
 			throw rejected(approval).addErrorLogData(logData);
 		}
-		verifyApproved(approval, request, property);
+		verifyApproved(approval, request, current.property());
 		log.info("KSPAY 승인 완료. orderNo={}, tid={}, payMethod={}", request.getOrderNo(), approval.getTid(), approval.getPayMethod());
 		return approval;
 	}
@@ -108,10 +113,12 @@ public final class KsPayUtils {
 	 *
 	 * @return 성공한 취소 응답 — data.tid, data.cancelAmount 로 확인한다
 	 * @throws CoreException BAD_REQUEST(요청 조합 오류) / INTERNAL_SERVER(api-key 미설정) / KSPAY_{respCode}(취소 거절) /
-	 *                       KSPAY_{code}(A0400 파라미터·A0401 인증·A0403 프로토콜 오류) / RESULT_UNKNOWN(KSTA 관리자 확인, 재시도 시 이중취소 위험)
+	 *                       KSPAY_{code}(A0400 파라미터·A0401 인증·A0403 프로토콜 오류 — 200·4xx 본문 모두) /
+	 *                       EXTERNAL_ERROR(연결 실패, 4xx 본문이 webfep 규격 아님) / RESULT_UNKNOWN(KSTA 관리자 확인, 재시도 시 이중취소 위험)
 	 */
 	public static KsPayDto.CancelResponse cancel(KsPayDto.CancelRequest request) {
-		KsPayProperty property = property();
+		Config current = config();
+		KsPayProperty property = current.property();
 		ValidateUtils.validate(request);
 		if (StringUtils.isBlank(property.getApiKey())) {
 			throw new CoreException(CommonErrorCode.INTERNAL_SERVER, "payment.kspay.api-key 설정이 없습니다. (KSTA > PG상점정보 > pgapi)");
@@ -121,20 +128,22 @@ public final class KsPayUtils {
 
 		KsPayDto.CancelResponse response;
 		try {
-			response = WebClientUtils.post(webfepClient, request.getPayMethod().getCancelPath(), h -> h.setContentType(JSON_UTF8),
-				buildCancelBody(request, property), KsPayDto.CancelResponse.class).block();
+			response = WebClientUtils.post(current.webfepClient(), request.getPayMethod().getCancelPath(), h -> h.setContentType(JSON_UTF8),
+				buildCancelBody(request, property), KsPayDto.CancelResponse.class).timeout(current.callTimeout()).block();
 		} catch (RuntimeException e) {
-			if (WebClientUtils.classify(e) == FailureType.UNKNOWN) {
+			FailureType failureType = WebClientUtils.classify(e);
+			if (failureType == FailureType.UNKNOWN) {
 				log.error("KSPAY 취소 결과불명 - 재시도 없음, KSTA 관리자 확인 필요. tradeKey={}", request.getTradeKey());
 				throw new CoreException(KsPayError.RESULT_UNKNOWN, "결제 취소 결과를 확인할 수 없습니다. 관리자 확인이 필요합니다.", e)
 					.addErrorLogData(logData);
 			}
+			if (failureType == FailureType.REJECTED) {
+				throw cancelClientError(e).addErrorLogData(logData);
+			}
 			throw new CoreException(KsPayError.EXTERNAL_ERROR, "결제 서버에 연결할 수 없습니다.", e).addErrorLogData(logData);
 		}
 
-		if (response == null || StringUtils.isBlank(response.getCode())
-				|| "A0500".equals(response.getCode()) || "A0999".equals(response.getCode())) {
-			// A0500(서버 오류)·A0999(기타 오류)는 처리 도중 실패일 수 있어 취소 성립 여부를 알 수 없다.
+		if (response == null || isCancelIndeterminate(response)) {
 			throw new CoreException(KsPayError.RESULT_UNKNOWN, "결제 취소 결과를 확인할 수 없습니다. 관리자 확인이 필요합니다.")
 				.addErrorLogData(logData)
 				.addErrorLogData("code", response == null ? null : response.getCode())
@@ -149,10 +158,10 @@ public final class KsPayUtils {
 	}
 
 	/** 결과불명 뒤 1회 재전송 — 재전송 응답이 거절이면 첫 요청의 승인 여부를 가릴 수 없어 거절로 확정하지 않는다 */
-	private static KsPayDto.Approval resendAfterUnknown(KsPayDto.ApproveRequest request, RuntimeException firstError) {
+	private static KsPayDto.Approval resendAfterUnknown(Config current, KsPayDto.ApproveRequest request, RuntimeException firstError) {
 		KsPayDto.Approval resent;
 		try {
-			resent = postApproval(request);
+			resent = postApproval(current, request);
 		} catch (RuntimeException retryError) {
 			log.error("KSPAY 승인 재전송 실패 - KSTA 관리자 확인 필요. orderNo={}", request.getOrderNo());
 			CoreException unknown = new CoreException(KsPayError.RESULT_UNKNOWN,
@@ -170,15 +179,15 @@ public final class KsPayUtils {
 	}
 
 	/** 채널별 승인 경로로 form POST 후 MS949 로 디코딩한 백틱 응답을 해석한다 */
-	private static KsPayDto.Approval postApproval(KsPayDto.ApproveRequest request) {
+	private static KsPayDto.Approval postApproval(Config current, KsPayDto.ApproveRequest request) {
 		MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
 		form.add("sndCommConId", request.getPayKey());
 		form.add("sndActionType", "1");
 		form.add("sndAmount", String.valueOf(request.getAmount()));
 		form.add("sndRpyParams", String.join("`", APPROVAL_FIELDS));
 
-		byte[] raw = WebClientUtils.post(approvalClient, request.getChannel().getApprovalPath(), h -> h.setContentType(FORM_UTF8),
-			form, byte[].class).block();
+		byte[] raw = WebClientUtils.post(current.approvalClient(), request.getChannel().getApprovalPath(), h -> h.setContentType(FORM_UTF8),
+			form, byte[].class).timeout(current.callTimeout()).block();
 		if (raw == null || raw.length == 0) {
 			throw new IndeterminateResponseException("승인 응답 바디 없음");
 		}
@@ -242,27 +251,30 @@ public final class KsPayUtils {
 								.build();
 	}
 
-	/** 승인 응답의 상점아이디 → 주문번호 → 금액을 대조한다 — 다른 상점으로 승인됐으면 우리 api-key 로는 취소도 안 된다 */
+	/**
+	 * 승인 응답의 상점아이디 → 주문번호 → 금액을 대조한다 — 불일치는 tid·payMethod 를 담은 {@link KsPayMismatchException}.
+	 * 다른 상점으로 승인됐으면 우리 api-key 로는 취소도 안 된다.
+	 */
 	private static void verifyApproved(KsPayDto.Approval approval, KsPayDto.ApproveRequest request, KsPayProperty property) {
 		if (!property.getMid().equals(approval.getStoreId())) {
-			throw new CoreException(KsPayError.MID_MISMATCH, "다른 상점아이디로 승인된 결제입니다. 관리자 확인이 필요합니다.")
-				.addErrorLogData("tid", approval.getTid())
+			throw mismatch(KsPayError.MID_MISMATCH, "다른 상점아이디로 승인된 결제입니다. 관리자 확인이 필요합니다.", approval)
 				.addErrorLogData("expectedMid", property.getMid())
 				.addErrorLogData("actualMid", StringUtils.truncate(approval.getStoreId(), 64));
 		}
 		if (!request.getOrderNo().trim().equals(approval.getOrderNo())) {
-			throw new CoreException(KsPayError.ORDER_MISMATCH, "결제 주문번호 불일치 - 승인 취소가 필요합니다.")
-				.addErrorLogData("tid", approval.getTid())
+			throw mismatch(KsPayError.ORDER_MISMATCH, "결제 주문번호 불일치 - 승인 취소가 필요합니다.", approval)
 				.addErrorLogData("expectedOrderNo", request.getOrderNo())
 				.addErrorLogData("actualOrderNo", StringUtils.truncate(approval.getOrderNo(), 64));
 		}
 		if (!request.getAmount().equals(approval.getAmount())) {
-			throw new CoreException(KsPayError.AMOUNT_MISMATCH, "결제 금액 불일치 - 승인 취소가 필요합니다.")
-				.addErrorLogData("tid", approval.getTid())
-				.addErrorLogData("payMethod", approval.getPayMethod())
+			throw mismatch(KsPayError.AMOUNT_MISMATCH, "결제 금액 불일치 - 승인 취소가 필요합니다.", approval)
 				.addErrorLogData("expectedAmount", request.getAmount())
 				.addErrorLogData("actualAmount", approval.getAmount());
 		}
+	}
+
+	private static KsPayMismatchException mismatch(KsPayError errorCode, String detail, KsPayDto.Approval approval) {
+		return new KsPayMismatchException(errorCode, detail, approval.getTid(), approval.getPayMethod());
 	}
 
 	/** 수단·취소유형·키 조합 검증 — 벤더 파라미터 오류(A0400) 전에 BAD_REQUEST 로 막는다 */
@@ -349,6 +361,39 @@ public final class KsPayUtils {
 		return new CoreException(ErrorCode.of("KSPAY_" + code, message, 400), message);
 	}
 
+	/** A0500(서버 오류)·A0999(기타 오류)·code 없음은 처리 도중 실패일 수 있어 취소 성립 여부를 알 수 없다 */
+	private static boolean isCancelIndeterminate(KsPayDto.CancelResponse response) {
+		return StringUtils.isBlank(response.getCode()) || "A0500".equals(response.getCode()) || "A0999".equals(response.getCode());
+	}
+
+	/**
+	 * 취소 4xx 본문의 webfep code 를 살린다 (A0400 파라미터·A0401 인증·A0403 프로토콜 오류 등).
+	 * 본문이 webfep 규격이 아닐 때만 EXTERNAL_ERROR, A0500·A0999 는 200 응답과 같게 결과불명.
+	 */
+	private static CoreException cancelClientError(RuntimeException error) {
+		WebClientResponseException clientError = WebClientUtils.findClientError(error).orElse(null);
+		Integer httpStatus = clientError == null ? null : clientError.getStatusCode().value();
+		KsPayDto.CancelResponse body = null;
+		if (clientError != null) {
+			try {
+				body = clientError.getResponseBodyAs(KsPayDto.CancelResponse.class);
+			} catch (RuntimeException ignored) {
+				// webfep 규격 본문이 아니다
+			}
+		}
+		if (body == null || StringUtils.isBlank(body.getCode())) {
+			return new CoreException(KsPayError.EXTERNAL_ERROR, "KSPAY 오류 응답입니다.", error).addErrorLogData("httpStatus", httpStatus);
+		}
+		if (isCancelIndeterminate(body)) {
+			log.error("KSPAY 취소 결과불명(4xx + {}) - 재시도 없음, KSTA 관리자 확인 필요.", body.getCode());
+			return new CoreException(KsPayError.RESULT_UNKNOWN, "결제 취소 결과를 확인할 수 없습니다. 관리자 확인이 필요합니다.", error)
+				.addErrorLogData("httpStatus", httpStatus)
+				.addErrorLogData("code", body.getCode())
+				.addErrorLogData("aid", body.getAid());
+		}
+		return cancelRejected(body).addErrorLogData("httpStatus", httpStatus).addErrorLogData("aid", body.getAid());
+	}
+
 	/** 취소 거절 — respCode 가 있으면 KSPAY_{respCode}, 없으면 API code. 인증·프로토콜 오류(A0401/A0403)는 설정 문제라 500 */
 	private static CoreException cancelRejected(KsPayDto.CancelResponse response) {
 		KsPayDto.CancelData data = response.getData();
@@ -361,11 +406,16 @@ public final class KsPayUtils {
 	}
 
 	/** 초기화 여부를 확인한다 — mid 미설정이면 자동설정이 꺼져 있어 여기서 드러난다 */
-	private static KsPayProperty property() {
-		if (ksPayProperty == null || approvalClient == null || webfepClient == null) {
+	private static Config config() {
+		Config current = config;
+		if (current == null) {
 			throw new CoreException(CommonErrorCode.INTERNAL_SERVER, "KsPayUtils 미초기화 - payment.kspay.mid 설정 확인");
 		}
-		return ksPayProperty;
+		return current;
+	}
+
+	/** 기동 시 정해지는 호출 설정 — 불변 */
+	private record Config(KsPayProperty property, WebClient approvalClient, WebClient webfepClient, Duration callTimeout) {
 	}
 
 	/** 200 이지만 결과를 판정할 수 없는 승인 응답 표지 (원문 미포함) */

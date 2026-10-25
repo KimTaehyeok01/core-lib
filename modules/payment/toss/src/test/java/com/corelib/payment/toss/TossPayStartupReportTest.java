@@ -26,6 +26,14 @@ class TossPayStartupReportTest {
 	}
 
 	@Test
+	@DisplayName("base-url 이 https 아님 - 기동 실패, 설정 이름을 담은 메시지")
+	void invalid() {
+		runner.withPropertyValues("payment.toss.secret-key=test_sk_secret-value", "payment.toss.base-url=http://api.tosspayments.com")
+			  .run(context -> assertThat(context).hasFailed()
+												 .getFailure().rootCause().hasMessageContaining("payment.toss.base-url"));
+	}
+
+	@Test
 	@DisplayName("시크릿 키 없음 - 미초기화, 넣어야 할 설정 이름 안내")
 	void notReady() {
 		runner.run(context -> {

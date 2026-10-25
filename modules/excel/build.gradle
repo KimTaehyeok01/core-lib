@@ -8,6 +8,9 @@ dependencies {
 
     testImplementation 'org.assertj:assertj-core'
     testImplementation 'org.apache.poi:poi-ooxml:5.5.1'
+    testImplementation 'org.springframework.boot:spring-boot-test'    // ExcelInitialize ApplicationContextRunner
+    testImplementation 'org.springframework.boot:spring-boot-autoconfigure'
+    testImplementation 'org.springframework:spring-test'
     testRuntimeOnly 'org.apache.logging.log4j:log4j-to-slf4j'    // POI 로그를 slf4j 로
     testRuntimeOnly 'ch.qos.logback:logback-classic'
 }

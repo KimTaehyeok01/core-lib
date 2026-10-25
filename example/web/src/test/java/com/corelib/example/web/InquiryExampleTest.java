@@ -70,7 +70,7 @@ class InquiryExampleTest {
 		String log = output.getOut();
 		assertThat(log).containsPattern("\\[inquiry-trace-0001\\].*문의 접수 알림 발송.*thread=task-\\d+.*traceId=inquiry-trace-0001");
 		assertThat(log).containsPattern("\\[inquiry-trace-0001\\].*POST /api/inquiries/create 200 \\d+ms ip=203\\.0\\.113\\.10");
-		assertThat(log).contains("\"email\":\"****\"").doesNotContain("hong@example.com");
+		assertThat(log).contains("\"email\":\"***\"").doesNotContain("hong@example.com");
 	}
 
 	@Test

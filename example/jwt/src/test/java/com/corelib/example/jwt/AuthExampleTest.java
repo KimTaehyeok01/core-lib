@@ -107,6 +107,18 @@ class AuthExampleTest {
 	}
 
 	@Test
+	@DisplayName("로그인 요청 - email 101자·password 65자·이메일 형식 아님은 400")
+	void loginRequestLimits() throws Exception {
+		String longEmail = "a".repeat(90) + "@example.com";    // 102자
+		postJson("/api/auth/login", "{\"email\":\"" + longEmail + "\",\"password\":\"pass-word-1\"}")
+			.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("C400"));
+		postJson("/api/auth/login", "{\"email\":\"ok@example.com\",\"password\":\"" + "p".repeat(65) + "\"}")
+			.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("C400"));
+		postJson("/api/auth/login", "{\"email\":\"not-an-email\",\"password\":\"pass-word-1\"}")
+			.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("C400"));
+	}
+
+	@Test
 	@DisplayName("리프레시 회전 — 새 쌍 발급, 옛 리프레시를 다시 쓰면 탈취로 보고 새 것까지 폐기")
 	void refreshRotation() throws Exception {
 		String first = signupAndLogin("rotate@example.com");

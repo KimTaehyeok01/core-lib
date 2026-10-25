@@ -4,7 +4,7 @@
 
 ## 의존성
 ```groovy
-implementation 'com.corelib:payment-nice:0.1.0'   // 저장소 설정은 루트 README "설치"
+implementation 'com.corelib:payment-nice:0.2.0'   // 저장소 설정은 루트 README "설치"
 ```
 
 ## 설정
@@ -37,9 +37,12 @@ NicePayUtils.getPayment(tid);
 
 ## 동작 원칙
 - 인증결과(브라우저 경유)는 서명 `sha256(authToken + clientId + amount + secretKey)` 와 **서버 보관 주문번호·금액**을 대조해야만 승인한다.
-- 승인 응답도 서명·주문번호·금액을 대조한다 — 다르면 `NICEPAY-SIGNATURE`·`ORDER`·`AMOUNT` (승인 성립 가능, 취소 필요).
+- 승인 응답도 서명·주문번호·금액을 대조한다 — 다르면 `NICEPAY-SIGNATURE`·`ORDER`·`AMOUNT` (승인 성립 가능, 취소 필요). 성공 상태(`paid`·가상계좌 `ready`)인데 서명이 없어도 `NICEPAY-SIGNATURE`.
+- 인증 실패(`authResultCode != 0000`)는 서명 전 브라우저 값이라 정제한다 — 코드는 영숫자 8자 이하만 `NICEPAY_{code}`, 아니면 `NICEPAY_AUTH_FAILED`. 메시지는 제어문자를 지우고 100자로 자른다.
+- 승인·취소·면세 금액은 999,999,999 이하 — 넘으면 호출 전에 `C400`.
 - 승인이 결과불명이면 매뉴얼대로 **자동 망취소** → 성공하면 `NICEPAY-NET-CANCELLED`(결제 미성립 확정), 망취소도 실패하면 `NICEPAY-UNKNOWN`.
 - 취소는 결과불명이어도 자동 재시도하지 않는다. NICEPAY 결과코드는 `NICEPAY_{code}` 로 넘긴다.
+- 호출은 동기(`.block()`)이고 한 번에 최대 `connect-timeout + read-timeout + 5초` 걸린다 (읽기 timeout 이 read 마다 다시 걸려 끝나지 않는 응답을 막는 전체 상한, 초과는 결과불명). **`@Transactional`·DB 커넥션 점유 구간 밖에서 호출한다.** 승인 결과불명이면 망취소까지 최대 2배.
 
 ## API 요약
 | 메서드 | 반환 |
@@ -55,7 +58,7 @@ NicePayUtils.getPayment(tid);
 |---|---|---|
 | `NICEPAY_{code}` | 400 | 인증 실패·사용자 취소·승인 거절 |
 | NICEPAY-AUTH-INVALID · NICEPAY-AUTH-MISMATCH | 400 | 인증결과 필수값 없음·주문과 다름 — 승인 안 함 |
-| NICEPAY-SIGNATURE | 400 | 위변조 의심 — 승인 응답이면 **즉시 취소** |
+| NICEPAY-SIGNATURE | 400 | 위변조 의심(서명 불일치·성공 응답인데 서명 없음) — 승인 응답이면 **즉시 취소** |
 | NICEPAY-ORDER · NICEPAY-AMOUNT | 400 | 승인 응답이 주문과 다름 — **즉시 취소** |
 | NICEPAY-NET-CANCELLED | 400 | 결과불명 → 망취소 완료, 결제 미성립 |
 | NICEPAY-EXTERNAL | 502 | 연결 실패 |

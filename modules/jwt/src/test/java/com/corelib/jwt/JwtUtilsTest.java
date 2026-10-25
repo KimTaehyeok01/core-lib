@@ -94,6 +94,22 @@ class JwtUtilsTest {
 	}
 
 	@Test
+	@DisplayName("alg 불일치 — 서명 전 헤더의 alg 원문(개행 포함 위조 값)은 로그 데이터에 싣지 않고 설정 알고리즘만 남긴다")
+	void algNotLogged() {
+		String payload = JwtUtils.issueAccessToken("member-1", List.of("USER"), null).split("\\.")[1];
+		String forgedAlg = "HS512\r\nINFO forged-log-line";
+		String token = Base64URL.encode("{\"alg\":\"" + forgedAlg.replace("\r", "\\r").replace("\n", "\\n") + "\"}") + "." + payload + ".c2ln";
+
+		assertThatThrownBy(() -> JwtUtils.verify(token))
+			.isInstanceOfSatisfying(CoreException.class, e -> {
+				assertThat(e.getErrorCode()).isEqualTo(JwtError.INVALID);
+				assertThat(e.getErrorLogData()).doesNotContainKey("alg").containsEntry("expectedAlg", "RS256");
+				assertThat(e.getErrorLogData().values()).noneMatch(value -> String.valueOf(value).contains("forged-log-line"));
+				assertThat(e.getMessage()).doesNotContain("forged-log-line");
+			});
+	}
+
+	@Test
 	@DisplayName("검증 전용(공개키만) — 다른 서비스 토큰 검증은 되고 발급은 JWT-KEY")
 	void verifyOnly() {
 		String token = JwtUtils.issueAccessToken("member-1", List.of("USER"), null);

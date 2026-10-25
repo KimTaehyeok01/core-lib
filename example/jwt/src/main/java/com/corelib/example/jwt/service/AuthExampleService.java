@@ -81,6 +81,7 @@ public class AuthExampleService {
 	public JwtDto.TokenPair login(AuthExampleDto.LoginRequest request) {
 		ValidateUtils.validate(request);
 		String key = key(request.getEmail());
+		purgeExpiredLoginFailures();    // 로그인 시도마다 — 공격 흔적만 쌓이고 지워지지 않던 맵을 간결하게 유지
 		countLoginAttempt(key);
 		AuthExampleDto.Member member = membersByEmail.get(key);
 		String actual = hash(request.getPassword(), member != null ? member.getPasswordSalt() : dummySalt);
@@ -89,6 +90,16 @@ public class AuthExampleService {
 		}
 		loginFailuresByEmail.remove(key);
 		return issue(member);
+	}
+
+	/**
+	 * 잠금이 풀렸고 상한에 닿지 않은 흔적을 지운다 — 성공·실패 시점 모두 호출돼 메모리가 영원히 자라지 않게 한다.
+	 * 실서비스는 Redis TTL 로 자동 만료되므로 이 정리는 메모리 저장소 전용.
+	 */
+	private void purgeExpiredLoginFailures() {
+		LocalDateTime now = DateTimeUtils.now();
+		loginFailuresByEmail.values().removeIf(failure ->
+			failure.getLockExpiresAt() != null && !now.isBefore(failure.getLockExpiresAt()));
 	}
 
 	/**

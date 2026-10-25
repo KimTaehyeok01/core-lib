@@ -6,6 +6,7 @@ import com.corelib.common.exception.CoreException;
 import com.corelib.common.util.ValidateUtils;
 import com.corelib.lang.StringUtils;
 import com.corelib.webclient.WebClientUtils;
+import java.time.Duration;
 import java.util.EnumSet;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,8 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *   <li>결과불명(읽기 timeout·5xx)이면 승인을 재전송하지 않고 조회 API 로 실제 상태를 확인한다</li>
  *   <li>취소는 결과불명이어도 자동 재시도하지 않는다 — 이중취소 위험</li>
  *   <li>토스 4xx 오류코드는 {@code TOSS_{code}} 로 그대로 넘긴다</li>
+ *   <li>동기 호출이라 한 번에 최대 connect-timeout + read-timeout + 5초 스레드를 붙잡는다 —
+ *       {@code @Transactional}·DB 커넥션 점유 구간 밖에서 호출한다</li>
  * </ul>
  */
 @Slf4j
@@ -32,14 +35,19 @@ public final class TossPayUtils {
 	private static final Set<TossPayDto.Status> NOT_APPROVED =
 		EnumSet.of(TossPayDto.Status.ABORTED, TossPayDto.Status.EXPIRED, TossPayDto.Status.CANCELED);
 
-	private static WebClient webClient;
+	/** 클라이언트·전체 상한을 한 번에 바꾼다 — 호출 중인 스레드가 섞인 조합을 보지 않게 */
+	private static volatile Config config;
 
 	private TossPayUtils() {
 	}
 
-	/** 기동 시 {@link TossPayInitialize} 가 1회 호출한다 — 소비자가 직접 부르지 않는다 */
-	static void initialize(WebClient client) {
-		webClient = client;
+	/**
+	 * 기동 시 {@link TossPayInitialize} 가 1회 호출한다 — 소비자가 직접 부르지 않는다.
+	 *
+	 * @param callTimeout {@code .block()} 전체 상한 — 초과는 읽기 timeout 과 같은 결과불명
+	 */
+	static void initialize(WebClient client, Duration callTimeout) {
+		config = new Config(client, callTimeout);
 	}
 
 	/**
@@ -51,12 +59,14 @@ public final class TossPayUtils {
 	 *                       NOT_APPROVED(재조회 결과 미성립) / RESULT_UNKNOWN(관리자 확인)
 	 */
 	public static TossPayDto.Payment confirm(TossPayDto.ConfirmRequest request) {
-		WebClient client = client();
+		Config current = config();
 		ValidateUtils.validate(request);
 
 		TossPayDto.Payment payment;
 		try {
-			payment = WebClientUtils.post(client, "/v1/payments/confirm", null, request, TossPayDto.Payment.class).block();
+			payment = WebClientUtils.post(current.webClient(), "/v1/payments/confirm", null, request, TossPayDto.Payment.class)
+									.timeout(current.callTimeout())
+									.block();
 		} catch (RuntimeException e) {
 			CoreException confirmed = toConfirmedError(e);
 			if (confirmed != null) {
@@ -82,14 +92,14 @@ public final class TossPayUtils {
 	 *                       RESULT_UNKNOWN(관리자 확인 — 재시도 시 이중취소 위험)
 	 */
 	public static TossPayDto.Payment cancel(String paymentKey, TossPayDto.CancelRequest request) {
-		WebClient client = client();
+		Config current = config();
 		requirePaymentKey(paymentKey);
 		ValidateUtils.validate(request);
 
 		TossPayDto.Payment payment;
 		try {
-			payment = WebClientUtils.post(client, "/v1/payments/{paymentKey}/cancel", null, request,
-				TossPayDto.Payment.class, paymentKey).block();
+			payment = WebClientUtils.post(current.webClient(), "/v1/payments/{paymentKey}/cancel", null, request,
+				TossPayDto.Payment.class, paymentKey).timeout(current.callTimeout()).block();
 		} catch (RuntimeException e) {
 			CoreException confirmed = toConfirmedError(e);
 			if (confirmed != null) {
@@ -115,12 +125,14 @@ public final class TossPayUtils {
 	 * @throws CoreException BAD_REQUEST / TOSS_{code}(예: NOT_FOUND_PAYMENT) / RESULT_UNKNOWN(통신 오류)
 	 */
 	public static TossPayDto.Payment getPayment(String paymentKey) {
-		WebClient client = client();
+		Config current = config();
 		requirePaymentKey(paymentKey);
 
 		TossPayDto.Payment payment;
 		try {
-			payment = WebClientUtils.get(client, "/v1/payments/{paymentKey}", null, TossPayDto.Payment.class, paymentKey).block();
+			payment = WebClientUtils.get(current.webClient(), "/v1/payments/{paymentKey}", null, TossPayDto.Payment.class, paymentKey)
+									.timeout(current.callTimeout())
+									.block();
 		} catch (RuntimeException e) {
 			CoreException confirmed = toConfirmedError(e);
 			if (confirmed != null) {
@@ -234,10 +246,15 @@ public final class TossPayUtils {
 	}
 
 	/** 초기화 여부를 확인한다 — secret-key 미설정이면 자동설정이 꺼져 있어 여기서 드러난다 */
-	private static WebClient client() {
-		if (webClient == null) {
+	private static Config config() {
+		Config current = config;
+		if (current == null) {
 			throw new CoreException(CommonErrorCode.INTERNAL_SERVER, "TossPayUtils 미초기화 - payment.toss.secret-key 설정 확인");
 		}
-		return webClient;
+		return current;
+	}
+
+	/** 기동 시 정해지는 호출 설정 — 불변 */
+	private record Config(WebClient webClient, Duration callTimeout) {
 	}
 }

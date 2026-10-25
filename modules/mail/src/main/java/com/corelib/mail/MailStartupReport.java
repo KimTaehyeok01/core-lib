@@ -26,12 +26,13 @@ public class MailStartupReport implements StartupReporter {
 
 	@Override
 	public StartupReport report() {
-		if (initialize.getIfAvailable() == null) {
+		MailInitialize current = initialize.getIfAvailable();
+		if (current == null) {
 			return StartupReport.notReady(NAME, "spring.mail.host 미설정 — 호출 시 '미초기화' 오류");
 		}
 		MailProperty value = property.getIfAvailable();
 		String from = value == null || StringUtils.isBlank(value.getFrom()) ? "미설정(core.mail.from)" : MaskingUtils.email(value.getFrom());
 		return StartupReport.ready(NAME, "smtp=" + environment.getProperty("spring.mail.host") + ":"
-			+ StringUtils.defaultIfBlank(environment.getProperty("spring.mail.port"), "25") + ", from=" + from);
+			+ StringUtils.defaultIfBlank(environment.getProperty("spring.mail.port"), "25") + ", from=" + from + ", " + current.timeout());
 	}
 }

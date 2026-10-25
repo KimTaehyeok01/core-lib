@@ -24,3 +24,9 @@ core:
 #   springdoc.swagger-ui.doc-expansion: none              API 목록 접힌 상태로 시작
 #   springdoc.swagger-ui.default-models-expand-depth: -1  맨 아래 Schemas 영역 숨김
 # 운영에서 문서를 숨기려면 springdoc.api-docs.enabled=false, springdoc.swagger-ui.enabled=false
+# web 모듈 + spring-boot-starter-security 와 함께 쓰면 문서 경로는 기본 비공개(인증 필요) — 이 예제는 web 모듈이 없어 그냥 열린다.
+# 그 구성에서 문서를 공개하려면 아래를 켠다.
+# core:
+#   web:
+#     security:
+#       public-docs: true    # /swagger-ui/**, /v3/api-docs/** 를 인증 없이 연다 (운영은 false 권장)

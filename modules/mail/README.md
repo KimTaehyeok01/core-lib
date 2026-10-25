@@ -4,7 +4,7 @@
 
 ## 의존성
 ```groovy
-implementation 'com.corelib:mail:0.1.0'   // 저장소 설정은 루트 README "설치"
+implementation 'com.corelib:mail:0.2.0'   // 저장소 설정은 루트 README "설치"
 ```
 `spring-boot-starter-mail`·`spring-boot-starter-validation` 이 함께 들어온다.
 
@@ -19,13 +19,15 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
-      mail.smtp.connectiontimeout: 5000
+      mail.smtp.connectiontimeout: 5000   # ms — 세 키를 빼면 기본값(연결 10000, 읽기·쓰기 30000)이 들어간다
       mail.smtp.timeout: 5000
       mail.smtp.writetimeout: 5000
 core:
   mail:
     from: noreply@my.domain
 ```
+JavaMail 은 timeout 키가 없으면 무한 대기한다. 그래서 `JavaMailSenderImpl` 이고 `mail.{protocol}.connectiontimeout`·`timeout`·`writetimeout` 이 없으면 위 기본값을 넣는다. `protocol: smtps` 면 `mail.smtps.*` 에 넣는다. 넣은 값은 그대로 두고, 기동 안내에 `timeout=10s/30s/30s`(연결/읽기/쓰기)로 표시한다.
+
 로컬 테스트는 Mailpit — `docker run -d -p 1025:1025 -p 8025:8025 axllent/mailpit` 후 `host: localhost`, `port: 1025`, 받은 메일은 http://localhost:8025.
 
 ## 사용법
@@ -47,7 +49,7 @@ MailUtils.send(MailDto.SendRequest.builder()
 | 클래스 | 내용 |
 |---|---|
 | `MailUtils` | `sendText(to, subject, text)` · `sendHtml(to, subject, html)` · `send(SendRequest)` |
-| `MailDto.SendRequest` | `from`(비우면 core.mail.from) · `to` · `cc` · `bcc` · `subject` · `content` · `contentType`(TEXT·HTML) · `attachments` / `text(...)` · `html(...)` |
+| `MailDto.SendRequest` | `from`(비우면 core.mail.from) · `to` · `cc` · `bcc` · `subject` · `content` · `contentType`(TEXT·HTML) · `attachments` / `text(...)` · `html(...)` — `cc`·`bcc`·`attachments` 는 null 이면 빈 목록으로 본다 |
 
 ## 에러코드
 | 코드 | 상태 | 언제 |

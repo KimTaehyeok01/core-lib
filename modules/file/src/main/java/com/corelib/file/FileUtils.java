@@ -15,7 +15,8 @@ import org.springframework.web.multipart.MultipartFile;
  */
 public final class FileUtils {
 
-	private static FileStorage fileStorage;
+	/** 기동 스레드가 넣고 요청 스레드가 읽는다 — volatile 로 다른 스레드에도 바로 보이게 */
+	private static volatile FileStorage fileStorage;
 
 	private FileUtils() {
 	}
@@ -66,10 +67,11 @@ public final class FileUtils {
 
 	/** 초기화 여부를 확인한다 — core.file.storage=s3 인데 AWS SDK 가 없으면 저장소가 만들어지지 않아 여기서 드러난다 */
 	private static FileStorage storage() {
-		if (fileStorage == null) {
+		final FileStorage current = fileStorage;
+		if (current == null) {
 			throw new CoreException(CommonErrorCode.INTERNAL_SERVER,
 				"FileUtils 미초기화 - core.file.storage 설정 확인 (s3 는 software.amazon.awssdk:s3 의존성 필요)");
 		}
-		return fileStorage;
+		return current;
 	}
 }

@@ -10,6 +10,8 @@ public interface FileStorage {
 	/**
 	 * 파일 업로드.
 	 * @param directory 하위 디렉터리 (예: "profile", "board/notice") - 영문/숫자/-/_ 와 / 만 허용
+	 * @param size 신고 크기 - 실제로 읽은 바이트가 max-size 를 넘으면 그 시점에 중단한다
+	 * @param contentType 쓰지 않는다 - 저장 Content-Type 은 확장자로 서버가 정한다 (호환용 파라미터)
 	 * @throws CoreException INVALID_FILE(확장자/크기/이름) / STORAGE_ERROR
 	 */
 	FileDto.StoredFile upload(String directory, String originalName, InputStream content, long size, String contentType);

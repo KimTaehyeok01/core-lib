@@ -5,7 +5,7 @@
 
 ## 의존성
 ```groovy
-implementation 'com.corelib:lang:0.1.0'   // 저장소 설정은 루트 README "설치"
+implementation 'com.corelib:lang:0.2.0'   // 저장소 설정은 루트 README "설치"
 ```
 설정 없음 — 자동설정도 없다.
 
@@ -14,7 +14,7 @@ implementation 'com.corelib:lang:0.1.0'   // 저장소 설정은 루트 README "
 StringUtils.isBlank(" ");                         // true (null·공백만)
 StringUtils.trimToNull("  ");                     // null
 StringUtils.defaultIfBlank(name, "익명");
-StringUtils.truncate(text, 100);                  // 로그·예외 메시지 길이 상한
+StringUtils.truncate(text, 100);                  // 로그·예외 메시지 길이 상한 (char 수, 이모지를 반쪽으로 자르지 않음)
 
 CollectionUtils.emptyIfNull(list).forEach(...);   // null 이어도 바로 순회
 
@@ -46,6 +46,7 @@ MaskingUtils.email("user@example.com");           // us**@example.com
 | `RoundUtils` | `round` · `ceil` · `floor` (BigDecimal, scale 음수 = 10원·100원 단위) · `round(double)` · `percentOf` · `rate` · `truncateWon` |
 
 ## 주의
+- `StringUtils.truncate` 의 길이는 char(UTF-16) 수다. 경계에 이모지 같은 서로게이트 쌍이 걸리면 그 앞에서 잘라 결과가 maxLength 보다 1 짧을 수 있다.
 - `RandomStringUtils` 는 `SecureRandom` 이라 인증번호·토큰에 써도 된다.
 - `DateTimeUtils` 는 엄격 해석이라 2월 30일·13월 같은 값은 `IllegalArgumentException`. 해석 실패 메시지에는 입력값을 30자까지만 넣는다.
 - `endOfDay` 는 23:59:59.999999999 — DB 기간 조회는 `>= startOfDay(오늘) AND < startOfDay(내일)` 이 안전하다.

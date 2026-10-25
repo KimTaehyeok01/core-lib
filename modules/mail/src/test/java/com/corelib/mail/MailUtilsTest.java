@@ -104,6 +104,44 @@ class MailUtilsTest {
 	}
 
 	@Test
+	@DisplayName("cc·bcc·attachments 가 null - 빈 목록으로 보고 정상 발송 (단일 파트, 참조 없음)")
+	void nullListsNormalized() throws Exception {
+		MailDto.SendRequest request = MailDto.SendRequest.builder()
+			.to(List.of("a@example.com"))
+			.cc(null)
+			.bcc(null)
+			.attachments(null)
+			.subject("안내")
+			.content("본문")
+			.build();
+
+		MailUtils.send(request);
+
+		MimeMessage message = sender.sent.get(0);
+		assertThat(message.getRecipients(Message.RecipientType.CC)).isNull();
+		assertThat(message.getRecipients(Message.RecipientType.BCC)).isNull();
+		assertThat(message.getContent()).isEqualTo("본문");
+	}
+
+	@Test
+	@DisplayName("첨부 목록 안의 null 항목 - BAD_REQUEST, 발송 안 함")
+	void nullAttachmentItem() {
+		List<MailDto.Attachment> attachments = new ArrayList<>();
+		attachments.add(null);
+		MailDto.SendRequest request = MailDto.SendRequest.builder()
+			.to(List.of("a@example.com"))
+			.subject("안내")
+			.content("본문")
+			.attachments(attachments)
+			.build();
+
+		assertThatThrownBy(() -> MailUtils.send(request))
+			.extracting(MailUtilsTest::errorCodeOf)
+			.isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThat(sender.sent).isEmpty();
+	}
+
+	@Test
 	@DisplayName("SMTP 오류 - SEND_FAILED")
 	void sendFailed() {
 		JavaMailSenderImpl failingSender = new JavaMailSenderImpl() {
@@ -145,5 +183,17 @@ class MailUtilsTest {
 		assertThatThrownBy(() -> MailUtils.sendText("user@example.com", " ", "본문"))
 			.extracting(MailUtilsTest::errorCodeOf)
 			.isEqualTo(CommonErrorCode.BAD_REQUEST);
+	}
+
+	@Test
+	@DisplayName("sendText/sendHtml 에 to=null - List.of(null) NPE 가 아니라 BAD_REQUEST (@NotEmpty)")
+	void nullTo() {
+		assertThatThrownBy(() -> MailUtils.sendText(null, "제목", "본문"))
+			.extracting(MailUtilsTest::errorCodeOf)
+			.isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThatThrownBy(() -> MailUtils.sendHtml(null, "제목", "<b>본문</b>"))
+			.extracting(MailUtilsTest::errorCodeOf)
+			.isEqualTo(CommonErrorCode.BAD_REQUEST);
+		assertThat(sender.sent).isEmpty();
 	}
 }

@@ -5,7 +5,7 @@ Swagger UI / OpenAPI 자동 설정 — 문서 정보, JWT 보안 스킴, 공통 
 
 ## 의존성
 ```groovy
-implementation 'com.corelib:swagger:0.1.0'   // 저장소 설정은 루트 README "설치"
+implementation 'com.corelib:swagger:0.2.0'   // 저장소 설정은 루트 README "설치"
 ```
 
 ## 설정

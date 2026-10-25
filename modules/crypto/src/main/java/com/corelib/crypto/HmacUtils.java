@@ -15,11 +15,14 @@ public final class HmacUtils {
 	}
 
 	/**
-	 * @throws CoreException INVALID_KEY(빈 키)
+	 * @throws CoreException INVALID_KEY(빈 키) / INVALID_ENCODING(null 메시지)
 	 */
 	public static byte[] hmacSha256(byte[] key, byte[] message) {
 		if (key == null || key.length == 0) {
 			throw new CoreException(CryptoError.INVALID_KEY, "HMAC 키가 비어 있습니다.");
+		}
+		if (message == null) {
+			throw new CoreException(CryptoError.INVALID_ENCODING, "HMAC 메시지가 없습니다.");
 		}
 		try {
 			Mac mac = Mac.getInstance(HMAC_SHA256);

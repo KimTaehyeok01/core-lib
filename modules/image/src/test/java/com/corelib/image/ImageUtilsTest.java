@@ -9,12 +9,16 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Base64;
 import java.util.List;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class ImageUtilsTest {
 
@@ -178,5 +182,79 @@ class ImageUtilsTest {
 		assertThat(ImageUtils.readableFormats()).contains("webp", "jpeg", "png");
 		assertThat(ImageUtils.info(WEBP).getFormat()).isEqualTo("webp");
 		assertThat(ImageUtils.resize(WEBP, 10, 10, ImageDto.Format.PNG).getWidth()).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("ImageIO 전역 설정 불변 — 디스크 캐시가 켜져 있고 캐시 폴더가 없어도 메모리 스트림으로 처리, useCache 는 그대로")
+	void keepsImageIoGlobals(@TempDir Path tempDir) throws Exception {
+		byte[] source = encode(halves(400, 200), "jpg");
+		File cacheDirectory = Files.createDirectory(tempDir.resolve("cache")).toFile();
+		boolean useCache = ImageIO.getUseCache();
+		ImageIO.setUseCache(true);
+		ImageIO.setCacheDirectory(cacheDirectory);
+		Files.delete(cacheDirectory.toPath());    // ImageIO 가 만든 스트림이면 임시 파일을 못 만들어 실패한다
+		try {
+			assertThat(ImageUtils.info(source).getWidth()).isEqualTo(400);
+			assertThat(ImageUtils.resize(source, 100, 100, ImageDto.Format.JPEG).getWidth()).isEqualTo(100);
+			assertThat(ImageUtils.resize(source, 100, 100, ImageDto.Format.PNG).getHeight()).isEqualTo(50);
+			assertThat(ImageIO.getUseCache()).isTrue();
+		} finally {
+			ImageIO.setCacheDirectory(null);
+			ImageIO.setUseCache(useCache);
+		}
+	}
+
+	@Test
+	@DisplayName("서브샘플링 간격 — 가장 큰 규격의 2배 해상도는 남기고, 절반 이상을 쓰는 규격이 있으면 건너뛰지 않음")
+	void subsamplingStep() {
+		ImageDto.Spec thumbnail = ImageDto.Spec.builder().name("thumbnail").width(64).height(64).mode(ImageDto.Mode.COVER).build();
+		ImageDto.Spec medium = ImageDto.Spec.builder().name("medium").width(300).height(300).build();
+		ImageDto.Spec large = ImageDto.Spec.builder().name("large").width(2000).height(2000).build();
+
+		assertThat(ImageUtils.subsampling(4000, 3000, List.of(thumbnail))).isEqualTo(23);            // COVER 64/3000 → 1/46.9
+		assertThat(ImageUtils.subsampling(4000, 3000, List.of(thumbnail, medium))).isEqualTo(6);     // FIT 300/4000 → 1/13.3
+		assertThat(ImageUtils.subsampling(4000, 3000, List.of(thumbnail, medium, large))).isEqualTo(1);    // FIT 2000/4000 = 1/2
+	}
+
+	@Test
+	@DisplayName("큰 JPEG 서브샘플링 — 3000×2001 을 1/5 로 읽어도 결과 크기는 원본 기준(FIT 300×200, COVER 150×150), 색 위치 유지")
+	void largeJpegSubsampled() throws Exception {
+		byte[] jpeg = encode(halves(3000, 2001), "jpg");
+		List<ImageDto.Spec> specs = List.of(
+			ImageDto.Spec.builder().name("fit").width(300).height(300).format(ImageDto.Format.PNG).build(),
+			ImageDto.Spec.builder().name("cover").width(150).height(150).mode(ImageDto.Mode.COVER).format(ImageDto.Format.PNG).build());
+		assertThat(ImageUtils.subsampling(3000, 2001, specs)).isEqualTo(5);    // 디코딩 600×401 — 그 크기로 계산하면 300×201 이 된다
+
+		List<ImageDto.Result> results = ImageUtils.variants(jpeg, specs);
+
+		BufferedImage fit = decode(results.get(0).getBytes());
+		assertThat(results.get(0).getWidth()).isEqualTo(300);
+		assertThat(results.get(0).getHeight()).isEqualTo(200);
+		assertThat(fit.getWidth()).isEqualTo(300);
+		assertThat(fit.getHeight()).isEqualTo(200);
+		assertThat(isRed(fit.getRGB(20, 100))).isTrue();
+		assertThat(isBlue(fit.getRGB(280, 100))).isTrue();
+
+		BufferedImage cover = decode(results.get(1).getBytes());
+		assertThat(cover.getWidth()).isEqualTo(150);
+		assertThat(cover.getHeight()).isEqualTo(150);
+		assertThat(isRed(cover.getRGB(10, 75))).isTrue();
+		assertThat(isBlue(cover.getRGB(140, 75))).isTrue();
+	}
+
+	@Test
+	@DisplayName("큰 JPEG + EXIF 6 — 건너뛰어 읽은 뒤 바로 세움 (3000×2001 → 세로 200×300, 위 빨강·아래 파랑)")
+	void largeJpegSubsampledWithExif() throws Exception {
+		byte[] phonePhoto = withOrientation(encode(halves(3000, 2001), "jpg"), 6);
+
+		ImageDto.Result upright = ImageUtils.resize(phonePhoto, 300, 300, ImageDto.Format.JPEG);
+		BufferedImage image = decode(upright.getBytes());
+
+		assertThat(upright.getWidth()).isEqualTo(200);
+		assertThat(upright.getHeight()).isEqualTo(300);
+		assertThat(image.getWidth()).isEqualTo(200);
+		assertThat(image.getHeight()).isEqualTo(300);
+		assertThat(isRed(image.getRGB(100, 30))).isTrue();
+		assertThat(isBlue(image.getRGB(100, 270))).isTrue();
 	}
 }

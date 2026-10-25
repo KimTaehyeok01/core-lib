@@ -26,7 +26,7 @@ public class FileStartupReport implements StartupReporter {
 		if (value == null || config == null) {
 			return StartupReport.notReady(NAME, "저장소 없음 — core.file.storage=s3 면 software.amazon.awssdk:s3 의존성 필요");
 		}
-		String limit = "max-size=" + config.getMaxSize().toMegabytes() + "MB";
+		String limit = "max-size=" + config.getMaxSize().toMegabytes() + "MB" + extensionWarning(config);
 		if (value instanceof LocalFileStorage) {
 			return StartupReport.ready(NAME, "local, base-dir=" + config.getLocal().getBaseDir() + ", " + limit);
 		}
@@ -34,5 +34,10 @@ public class FileStartupReport implements StartupReporter {
 			return StartupReport.ready(NAME, "s3, bucket=" + config.getS3().getBucket() + ", region=" + config.getS3().getRegion() + ", " + limit);
 		}
 		return StartupReport.ready(NAME, "custom(" + value.getClass().getSimpleName() + "), " + limit);
+	}
+
+	/** 허용 목록이 비면 차단 목록 밖 확장자를 모두 받는다 — 업로드 용도에 맞는 목록을 두도록 알린다 */
+	private static String extensionWarning(FileProperty config) {
+		return config.getAllowedExtensions().isEmpty() ? ", 허용 확장자 미설정 — allowed-extensions 지정 권장" : "";
 	}
 }

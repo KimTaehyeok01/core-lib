@@ -70,12 +70,14 @@ public class S3FileStorage extends AbstractFileStorage {
 		}
 	}
 
+	/** presigned URL 은 attachment 로 내려받게 한다 — 브라우저가 파일을 페이지로 열지 않게 */
 	@Override
 	public String getUrl(String key) {
 		validateKey(key);
 		GetObjectPresignRequest request = GetObjectPresignRequest.builder()
 																  .signatureDuration(presignedUrlExpiry)
-																  .getObjectRequest(get -> get.bucket(bucket).key(key))
+																  .getObjectRequest(get -> get.bucket(bucket).key(key)
+																							  .responseContentDisposition("attachment"))
 																  .build();
 		return presigner.presignGetObject(request).url().toString();
 	}
