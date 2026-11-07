@@ -1,0 +1,10 @@
+// example-redis: redis 모듈로 만든 쇼핑몰 예제 — 상품 상세 캐시·선착순 쿠폰(분산 락)·인기 검색어(ZSet) — http://localhost:8118
+
+dependencies {
+    implementation project(':modules:redis')
+    implementation project(':modules:common')
+    implementation project(':modules:lang')
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    testImplementation 'org.testcontainers:junit-jupiter'    // 테스트용 Redis — Docker 가 없으면 건너뛴다
+}

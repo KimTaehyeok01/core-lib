@@ -30,6 +30,7 @@ configure(leafProjects) {
     tasks.withType(JavaCompile).configureEach {
         options.encoding = 'UTF-8'    // 한글 소스가 OS 기본 인코딩(x-windows-949)으로 깨지는 것 방지
         options.release = 17          // JDK 21 로 빌드해도 17 API 만 허용 — JDK 17 소비자의 NoSuchMethodError 방지
+        options.compilerArgs << '-parameters'  // @RedisLock SpEL(#id) 등 메서드 파라미터명 보존 — 미보존 시 서로 다른 자원이 같은 락으로 수렴
     }
 
     tasks.named('test') {

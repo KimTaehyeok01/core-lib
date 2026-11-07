@@ -45,3 +45,14 @@
 - [x] image — 리사이즈·크롭·다중 규격·EXIF 회전·webp 읽기, 해상도 폭탄 차단
 - [x] 예제 jwt · auth/otp · excel · image
 - [ ] README · 전체 빌드 · 실기동
+
+## redis 모듈 (2026-11-07)
+- [ ] modules/redis — build.gradle · settings 등록 (starter-data-redis · redisson 3.52.0)
+- [ ] RedisProperty(core.redis.key-prefix·trusted-packages) · RedisError
+- [ ] RedisInitialize — 토폴로지 키 있을 때만, redisTemplate(JSON)·RedisCacheManager·@EnableCaching·Lettuce 기본 timeout 10s·RedissonClient·기동 ping
+- [ ] RedisUtils — Key·Strings·Sets·Lists·Hashes·ZSets (key-prefix, SCAN)
+- [ ] @RedisLock + RedisLockInitialize(어드바이저) — SpEL 키·대기/보유·failOpen·409/500, 트랜잭션 바깥
+- [ ] RedisStartupReport
+- [ ] 단위 테스트 + Redis 통합 테스트(Testcontainers, Docker 없으면 건너뜀)
+- [ ] example/redis (8118) — 상품 캐시·선착순 쿠폰(락)·인기 검색어(ZSet) + 테스트
+- [ ] README(모듈·예제·루트) · CLAUDE.md 구조 · 전체 빌드

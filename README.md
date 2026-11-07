@@ -80,6 +80,7 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 | `example/auth/otp` | 8115 | 2단계 인증 등록(QR)·검증·재사용 차단·잠금 | 선택 `OTP_SECRET_KEY` |
 | `example/excel` | 8116 | 회원 명단 다운로드·양식·일괄 등록·목록 페이지 | - |
 | `example/image` | 8117 | 프로필 사진 3종 규격 | - |
+| `example/redis` | 8118 | 쇼핑몰: 상품 캐시·선착순 쿠폰 분산 락·인기 검색어 ZSet | - (로컬 Redis) |
 
 각 예제 폴더의 `README.md` 에 흐름과 "소비 프로젝트에 옮길 것"이 있다.
 
@@ -109,6 +110,7 @@ example/             모듈별 실행 예제 (modules/ 와 같은 모양, 배포
 | [jwt](modules/jwt) | `jwt` | JWT 발급·검증·JWKS, Bearer 필터 | - |
 | [excel](modules/excel) | `excel` | 엑셀·CSV 쓰기/읽기, 수식 주입 방지 | - |
 | [image](modules/image) | `image` | 리사이즈·크롭·다중 규격·EXIF·webp 읽기 | - |
+| [redis](modules/redis) | `redis` | Redis 자료구조·Spring Cache·Redisson 분산 락 (`@RedisLock` scope REQUEST/GLOBAL) | - |
 | [swagger](modules/swagger) | `swagger` | OpenAPI 자동 설정·공통 에러 응답 | - |
 | [mail](modules/mail) | `mail` | SMTP 메일 발송 | - |
 | [file](modules/file) | `file` | 로컬·S3 파일 저장 | - |

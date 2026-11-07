@@ -12,12 +12,12 @@
 ### 스캐폴드 구조
 ```
 modules/                     # 배포 라이브러리 (java-library + maven-publish)
-├── lang, common, crypto, swagger, file, mail, webclient, web, jwt, excel, image
+├── lang, common, crypto, swagger, file, mail, webclient, web, jwt, excel, image, redis
 ├── auth/{nice, kcb, otp}            # artifactId: auth-nice, auth-kcb, auth-otp
 └── payment/{toss, nice, kspay}      # artifactId: payment-toss, payment-nice, payment-kspay
 example/                     # modules/ 와 1:1 대응 실행 예제 (*ExampleApplication, bootJar 만)
 ├── lang(8101) common(8102) crypto(8103) webclient(8104) swagger(8105) mail(8106) file(8107)
-├── web(8113) jwt(8114) excel(8116) image(8117)
+├── web(8113) jwt(8114) excel(8116) image(8117) redis(8118)
 ├── auth/{nice(8108), kcb(8109), otp(8115)}
 └── payment/{toss(8110), nice(8111), kspay(8112)}
 ```
@@ -39,6 +39,7 @@ example/                     # modules/ 와 1:1 대응 실행 예제 (*ExampleAp
 - file / mail: `*Initialize` + `*StartupReport`
 - excel / image / auth-otp: `*Initialize`
 - auth-nice / auth-kcb / payment-toss / payment-nice / payment-kspay: `*Initialize` + `*StartupReport`
+- redis: `RedisInitialize`, `RedisLockInitialize`, `RedisStartupReport` (접속은 표준 `spring.data.redis.*`)
 - lang / crypto / webclient: 자동 구성 없음 (정적 유틸)
 
 ### 리소스 구조

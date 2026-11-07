@@ -1,0 +1,3 @@
+com.corelib.redis.RedisInitialize
+com.corelib.redis.RedisLockInitialize
+com.corelib.redis.RedisStartupReport

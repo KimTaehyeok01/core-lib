@@ -107,3 +107,12 @@
 - otp: RFC 6238 부록 B 9개 벡터(SHA1·256·512) 통과. 재사용 방지는 timeStep 을 호출측이 저장, 잠금도 호출측.
 - excel: ReadResult 에 rowNumbers 추가 — 업무 검증 오류를 엑셀 행 번호로 알리려고(예제에서 필요해서 모듈 보강). 날짜 해석 오류 메시지에 입력값을 넣지 않게 고정 문장.
 - image: EXIF 방향 5·7 변환식은 좌표 대입으로 검증, 6·3·8 은 테스트로. ImageIO.setUseCache(false)(임시 파일 안 남김), scanForPlugins(실행 jar 의 webp 플러그인 등록).
+
+## 10차 — redis 모듈 (2026-11-07)
+- 회사 core-docs 의 redis(RedisUtils·RedisCache·RedissonLock·RedisSetup) 는 기능 목록으로만 참고 — 이전 차수와 같은 원칙. 코드·API 이름은 새로 설계.
+- 접속 설정은 Boot 표준 `spring.data.redis.*` 를 그대로 쓴다 — 커넥션 팩토리·standalone/sentinel/cluster·SSL 은 Boot 자동설정 몫. 회사 문서의 자체 토폴로지 형식 검증은 옮기지 않는다(Boot·Lettuce 가 이미 검증). core 고유 값만 `core.redis.*`.
+- 활성 조건: `spring.data.redis.host`·`url`·`sentinel.nodes`·`cluster.nodes` 중 하나라도 값이 있으면. Boot RedisProperties 는 host 기본값이 localhost 라 바인딩 결과가 아니라 Environment 원문으로 판단.
+- Redis 가 있는데 연결이 안 되면 기동 실패(ping) — 로컬 캐시 폴백 없음. 인스턴스마다 캐시가 갈리고 락이 무력화되는 것을 조용히 넘기지 않으려고.
+- 분산 락은 Redisson 3.52.0 (2025-09-25, OSV 0). 4.x(4.8.0) 는 reactor 3.8 등 Boot 3.5 BOM 과 어긋나 3.x 마지막 버전을 택함.
+- 락 어드바이저는 AspectJ 없이 Spring AOP(AnnotationMatchingPointcut + INFRASTRUCTURE 어드바이저) — @Transactional 과 같은 방식이라 aspectjweaver 의존이 필요 없다. order 는 LOWEST_PRECEDENCE-1 로 트랜잭션 바깥.
+- Redis 미설정인데 @RedisLock 을 부르면 락 없이 통과하지 않고 500 (failOpen=true 만 통과).
