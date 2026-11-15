@@ -1,0 +1,8 @@
+// example-extractor: extractor 모듈 사용 예 — OKT 키워드/토큰/정규화 — http://localhost:8119
+
+dependencies {
+    implementation project(':modules:extractor')
+    implementation project(':modules:common')
+    implementation project(':modules:lang')
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+}

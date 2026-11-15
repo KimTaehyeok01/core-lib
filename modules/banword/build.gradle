@@ -1,0 +1,19 @@
+// banword: 금지어 검사 — Aho-Corasick + OKT 토큰 경계 정렬. 데이터 공급은 소비자가 BanWordSource 로 제공
+
+dependencies {
+    api project(':modules:common')
+    api project(':modules:lang')
+    api 'org.springframework.boot:spring-boot-starter-cache:3.5.16'   // CacheManager/Cache API (Redis 분기용, Direct 모드 영향 없음)
+    api 'org.ahocorasick:ahocorasick:0.6.3'
+
+    compileOnly project(':modules:extractor')      // 형태소 분기(getBanWordsWithKeywordExtractor) 호출 시에만 OKT 를 끈다
+    compileOnly project(':modules:redis')          // RedisCacheManager 분기용 (Redis 미사용 앱은 Direct 폴백)
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    compileOnly 'org.slf4j:slf4j-api'
+
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    testImplementation project(':modules:extractor')
+    testImplementation project(':modules:redis')
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

@@ -1,0 +1,13 @@
+// example-banword: banword 모듈 사용 예 — BanWordSource 를 InMemory 구현으로 제공, Direct 캐시 모드 — http://localhost:8120
+
+dependencies {
+    implementation project(':modules:common')
+    implementation project(':modules:web')
+    implementation project(':modules:banword')
+    implementation project(':modules:extractor')      // 형태소 분기 메서드 데모용
+    implementation project(':modules:lang')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

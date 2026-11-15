@@ -1,0 +1,12 @@
+// extractor: OKT(Open Korean Text) 기반 형태소/키워드 추출 유틸 — KeywordExtractorUtils 정적 API
+
+dependencies {
+    api project(':modules:common')
+    api project(':modules:lang')
+    api 'org.openkoreantext:open-korean-text:2.1.0'   // Scala 2.12 트랜지티브 ~5MB — 의도된 의존 (미사용 앱은 compileOnly 로 격리)
+
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure'
+    compileOnly 'org.slf4j:slf4j-api'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}

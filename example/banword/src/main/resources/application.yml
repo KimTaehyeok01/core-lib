@@ -1,0 +1,10 @@
+server:
+  port: 8120
+
+spring:
+  application:
+    name: banword-example
+
+core:
+  banword:
+    max-text-length: 10000
